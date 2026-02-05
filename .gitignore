@@ -1,8 +1,9 @@
-# Virtual Environments
+# Data and local storage
+data/raw/*.pdf
+data/vectorstore/
 .venv/
 venv/
-ENV/
-env/
+__pycache__/
 
 # Python Bytecode (Compiled files)
 __pycache__/
