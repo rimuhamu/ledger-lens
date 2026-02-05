@@ -5,7 +5,7 @@ from nodes import analyst_node, research_node
 test_dataset = [
     {
         "question": "What was BCA's total loan portfolio in 2024?",
-        "expected_fact": "Rp921.9 trillion  
+        "expected_fact": "Rp921.9 trillion"
     },
     {
         "question": "What was BCA's year-over-year loan growth rate in 2024?",
