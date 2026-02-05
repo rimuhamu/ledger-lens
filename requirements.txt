@@ -1,0 +1,8 @@
+langchain
+langgraph
+chromadb
+fastembed
+fastapi
+uvicorn
+python-dotenv
+ragas
