@@ -45,16 +45,21 @@ def analyst_node(state: Dict[str, Any]):
     question = state["question"]
 
     prompt = ChatPromptTemplate.from_template("""
-    You are a Senior Investment Analyst. 
-    Use the following snippets from the BCA 2024 Annual Report to answer the query.
-    
-    Context: {context}
-    Question: {question}
-    
-    Format your answer with:
-    1. Key Metric (e.g., Loan Growth, CASA Ratio)
-    2. Analysis (What does this mean for investors?)
-    3. Source Reference (Page number or section if available)
+        You are a strict financial analyst assistant. 
+        Your task is to answer the user's question based ONLY on the provided context below.
+
+        Context:
+        {context}
+
+        Question: 
+        {question}
+
+        Instructions:
+        1. citations: Every claim you make must include a reference to the specific context chunk (e.g., [Source 1]).
+        2. No Outside Knowledge: If the answer is not in the context, strictly state: "I cannot answer this based on the provided documents."
+        3. Do not speculate or make up numbers.
+
+        Answer:
     """)
 
     chain = prompt | llm
