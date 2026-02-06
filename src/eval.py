@@ -1,94 +1,131 @@
 import pandas as pd
-import re
+from datasets import Dataset
+from ragas import evaluate
+from ragas.metrics import (
+    AnswerRelevancy,
+    Faithfulness,
+    ContextRecall,
+    ContextPrecision,
+)
+from ragas.llms import LangchainLLMWrapper
+from ragas.embeddings import LangchainEmbeddingsWrapper
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from nodes import analyst_node, research_node
 
+# Configure RAGAS to use OpenAI models explicitly
+ragas_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini", temperature=0))
+ragas_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings())
 
-def check_answer(expected_fact: str, answer: str):
-    """
-    Check if the expected fact is present in the answer.
-    Uses flexible matching: case-insensitive and extracts key numeric values.
-
-    """
-    expected_lower = expected_fact.lower()
-    answer_lower = answer.lower()
-    
-    # Direct substring match (case-insensitive)
-    if expected_lower in answer_lower:
-        return True
-    
-    # Extract numeric values from expected fact (e.g., "13.8", "921.9", "24.8")
-    expected_numbers = re.findall(r'\d+\.?\d*', expected_fact)
-    
-    # Check if all expected numbers appear in the answer
-    if expected_numbers:
-        all_numbers_found = all(num in answer for num in expected_numbers)
-        if all_numbers_found:
-            return True
-    
-    # Handle currency amounts (e.g., "Rp921.9 trillion" -> check for "921.9" and "trillion")
-    if 'rp' in expected_lower or 'trillion' in expected_lower or 'billion' in expected_lower:
-        key_terms = re.findall(r'[\d.]+|trillion|billion', expected_lower)
-        if key_terms and all(term in answer_lower for term in key_terms):
-            return True
-    
-    # Handle percentages (e.g., "13.8% YoY" -> check for "13.8" and "%")
-    if '%' in expected_fact:
-        percentage_match = re.search(r'([\d.]+)\s*%', expected_fact)
-        if percentage_match:
-            pct_value = percentage_match.group(1)
-            if pct_value in answer and '%' in answer:
-                return True
-    
-    return False
-
+# Instantiate metrics with LLM and embeddings
+answer_relevancy = AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings)
+faithfulness = Faithfulness(llm=ragas_llm)
+context_recall = ContextRecall(llm=ragas_llm)
+context_precision = ContextPrecision(llm=ragas_llm)
 
 # Define 'Ground Truth' test cases based on the BCA 2024 Report
 test_dataset = [
     {
         "question": "What was BCA's total loan portfolio in 2024?",
-        "expected_fact": "Rp921.9 trillion"
+        "ground_truth": "BCA's total loan portfolio in 2024 was Rp921.9 trillion, representing a 13.8% year-over-year growth."
     },
     {
         "question": "What was BCA's year-over-year loan growth rate in 2024?",
-        "expected_fact": "13.8% YoY"
+        "ground_truth": "BCA's year-over-year loan growth rate in 2024 was 13.8%."
     },
     {
         "question": "What was BCA's sustainable financing portfolio in 2024?",
-        "expected_fact": "Rp229 trillion"
+        "ground_truth": "BCA's sustainable financing portfolio in 2024 was Rp229 trillion, which represented 24.8% of total loans."
     },
     {
         "question": "What percentage of total loans was sustainable financing?",
-        "expected_fact": "24.8%"
+        "ground_truth": "Sustainable financing represented 24.8% of BCA's total loans in 2024."
     },
     {
         "question": "What was the year-over-year growth rate of BCA's sustainable financing in 2024?",
-        "expected_fact": "12.5% YoY"
+        "ground_truth": "BCA's sustainable financing grew by 12.5% year-over-year in 2024."
     },
 ]
 
+
 def run_evaluation():
+    """
+    Run RAGAS evaluation on the LedgerLens agent.
+    
+    RAGAS Metrics:
+    - Answer Relevancy: How relevant is the answer to the question?
+    - Faithfulness: Is the answer grounded in the retrieved context?
+    - Context Recall: How much of the ground truth is captured in the context?
+    - Context Precision: Are the relevant contexts ranked higher?
+    """
     results = []
     
+    print("\n--- Running LedgerLens Agent on Test Cases ---")
     for test in test_dataset:
         state = {"question": test["question"]}
         state.update(research_node(state))
         state.update(analyst_node(state))
         
-        is_correct = check_answer(test["expected_fact"], state["answer"])
-        
         results.append({
-            "Question": test["question"],
-            "Correct": is_correct,
-            "Agent_Response": state["answer"][:100] + "..."
+            "question": test["question"],
+            "answer": state["answer"],
+            "contexts": state["contexts"],  # RAGAS expects a list of contexts
+            "ground_truth": test["ground_truth"]
         })
         
-    pd.set_option('display.max_colwidth', None)
+        print(f"✓ Processed: {test['question'][:60]}...")
+    
+    # Convert to RAGAS-compatible dataset
+    dataset = Dataset.from_list(results)
+    
+    print("\n--- Evaluating with RAGAS Metrics ---")
+    evaluation_result = evaluate(
+        dataset,
+        metrics=[
+            answer_relevancy,
+            faithfulness,
+            context_recall,
+            context_precision,
+        ],
+    )
+    
+    # Display results
+    df = evaluation_result.to_pandas()
+    
+    pd.set_option('display.max_colwidth', 50)
     pd.set_option('display.max_rows', None)
     pd.set_option('display.expand_frame_repr', False)
-    df = pd.DataFrame(results)
-    print("\n--- LEDGERLENS PERFORMANCE REPORT ---")
-    print(df.to_string())
-    return df
+    pd.set_option('display.precision', 3)
+    
+    print("\n" + "="*80)
+    print("LEDGERLENS RAGAS EVALUATION REPORT")
+    print("="*80)
+    print("\nOverall Scores:")
+    print("-" * 80)
+    
+    # Show aggregate metrics
+    metrics_summary = {
+        "Answer Relevancy": df["answer_relevancy"].mean(),
+        "Faithfulness": df["faithfulness"].mean(),
+        "Context Recall": df["context_recall"].mean(),
+        "Context Precision": df["context_precision"].mean(),
+    }
+    
+    for metric, score in metrics_summary.items():
+        print(f"{metric:.<30} {score:.3f}")
+    
+    print("\n" + "="*80)
+    print("Detailed Results:")
+    print("="*80)
+
+    question_col = "user_input" if "user_input" in df.columns else "question"
+    metric_cols = ["answer_relevancy", "faithfulness", "context_recall", "context_precision"]
+    display_cols = [question_col] + [c for c in metric_cols if c in df.columns]
+    print(df[display_cols].to_string(index=False))
+    
+    print("\n")
+    
+    return evaluation_result, df
+
 
 if __name__ == "__main__":
     run_evaluation()
