@@ -3,12 +3,21 @@ from typing import Any, Dict
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from database import Database
+from typing import TypedDict, List
+
+# Define the state structure
+class AgentState(TypedDict):
+    question: str
+    context: str
+    contexts: List[str]  # RAGAS expects a list of context strings
+    answer: str
+    is_valid: bool
 
 db = Database()
 retriever = db.get_retriever()
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
-def research_node(state: Dict[str, Any]) -> Dict[str, Any]:
+def research_node(state: Dict[str, Any]):
     """
     Research node
     Uses RAG to find facts in the document.
@@ -17,9 +26,14 @@ def research_node(state: Dict[str, Any]) -> Dict[str, Any]:
     question = state["question"]
 
     docs = retriever.invoke(question)
+    
     context = "\n\n".join([doc.page_content for doc in docs])
+    contexts = [doc.page_content for doc in docs]  # List format for RAGAS
 
-    return {"context": context}
+    return {
+        "context": context,
+        "contexts": contexts
+    }
 
 def analyst_node(state: Dict[str, Any]):
     """
