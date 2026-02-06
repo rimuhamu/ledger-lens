@@ -4,6 +4,9 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Database:
@@ -12,7 +15,7 @@ class Database:
         self.vectorstore = None
         self.embeddings = OpenAIEmbeddings()
 
-    def ingest_document(self, file_path) -> bool:
+    def ingest_document(self, file_path):
         """
         Ingest a PDF document into the vector store.
         
@@ -63,7 +66,7 @@ class Database:
             print(f"Error ingesting document: {e}")
             return False
 
-    def get_retriever(self, k: int = 3) -> Optional[BaseRetriever]:
+    def get_retriever(self, k: int = 3):
         """
         Get the retriever from the vector store.
         Loads from disk if vectorstore not initialized but exists.
