@@ -6,7 +6,7 @@ from database import Database
 
 db = Database()
 retriever = db.get_retriever()
-llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
+llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
 def research_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -21,7 +21,7 @@ def research_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     return {"context": context}
 
-def analyst_node(state: Dict[str, Any]) -> Dict[str, Any]:
+def analyst_node(state: Dict[str, Any]):
     """
     Analyst node
     Synthesizes the raw data into a professional thesis.
@@ -31,7 +31,7 @@ def analyst_node(state: Dict[str, Any]) -> Dict[str, Any]:
     question = state["question"]
 
     prompt = ChatPromptTemplate.from_template("""
-    You are a Senior Investment Analyst at Scalable Capital. 
+    You are a Senior Investment Analyst. 
     Use the following snippets from the BCA 2024 Annual Report to answer the query.
     
     Context: {context}
@@ -48,7 +48,7 @@ def analyst_node(state: Dict[str, Any]) -> Dict[str, Any]:
     response = chain.invoke({"context": context, "question": question})
     return {"answer": response.content}
 
-def validator_node(state: Dict[str, Any]) -> Dict[str, Any]:
+def validator_node(state: Dict[str, Any]):
     """
     Validator node
     Checks for hallucinations or missing data.
