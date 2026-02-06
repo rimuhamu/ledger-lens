@@ -1,9 +1,8 @@
 import os
 from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
-from langchain_core.documents import Document
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,7 +29,7 @@ class Database:
             return False
 
         try:
-            loader = PyPDFLoader(file_path)
+            loader = PyMuPDFLoader(file_path)
             documents = loader.load()
 
             if not documents:
@@ -66,13 +65,13 @@ class Database:
             print(f"Error ingesting document: {e}")
             return False
 
-    def get_retriever(self, k: int = 3):
+    def get_retriever(self, k: int = 8):
         """
         Get the retriever from the vector store.
         Loads from disk if vectorstore not initialized but exists.
         
         Args:
-            k: Number of documents to retrieve (default: 3)
+            k: Number of chunks to retrieve (default: 8)
             
         Returns:
             Retriever object or None if no vectorstore exists
