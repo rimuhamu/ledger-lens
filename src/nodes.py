@@ -13,7 +13,9 @@ class AgentState(TypedDict):
     answer: str
     is_valid: bool
 
-db = Database()
+# Get the project root directory (parent of src/)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+db = Database(db_path=os.path.join(PROJECT_ROOT, "data", "vectorstore"))
 retriever = db.get_retriever()
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
