@@ -14,6 +14,7 @@ Built with LangChain, LangGraph, and ChromaDB, it provides a FastAPI endpoint fo
 ## Features
 
 - 🔍 **RAG-based Document Search** — Semantic retrieval from PDF financial reports
+- 📤 **Dynamic Document Upload** — Upload and analyze any PDF report via API
 - 🤖 **Multi-Agent Workflow** — Research → Analyst → Validator pipeline with LangGraph
 - ✅ **Built-in Verification** — Automatic hallucination detection and answer validation
 - 📈 **RAGAS Evaluation** — Comprehensive evaluation suite with industry-standard metrics
@@ -93,12 +94,12 @@ The API will be available at `http://localhost:8000`
 
 ### API Endpoints
 
-#### Health Check
+#### 1. Health Check
 ```bash
 GET /
 ```
 
-#### Analyze Financial Data
+#### 2. Analyze Pre-loaded Document (BCA Report)
 ```bash
 POST /analyze
 Content-Type: application/json
@@ -116,6 +117,48 @@ Content-Type: application/json
   "verification_status": "PASS",
   "metadata": {
     "source": "BCA Annual Report 2024"
+  }
+}
+```
+
+#### 3. 🆕 Upload & Analyze Any Report
+```bash
+POST /upload-and-analyze
+Content-Type: multipart/form-data
+
+file: <your-report.pdf>
+ticker: AAPL
+query: What was the total revenue in 2024?
+```
+
+**Using cURL:**
+```bash
+curl -X POST "http://localhost:8000/upload-and-analyze" \
+  -F "file=@/path/to/report.pdf" \
+  -F "ticker=AAPL" \
+  -F "query=What was the total revenue in 2024?"
+```
+
+**Using Python:**
+```python
+import requests
+
+url = "http://localhost:8000/upload-and-analyze"
+files = {'file': open('report.pdf', 'rb')}
+data = {'ticker': 'AAPL', 'query': 'What was the revenue?'}
+
+response = requests.post(url, files=files, data=data)
+print(response.json())
+```
+
+**Response:**
+```json
+{
+  "answer": "Apple's total revenue in 2024 was $394.3 billion...",
+  "verification_status": "PASS",
+  "metadata": {
+    "source": "apple_annual_report.pdf",
+    "ticker": "AAPL"
   }
 }
 ```
@@ -141,19 +184,32 @@ This runs the agent against predefined test cases and outputs metrics including:
 ledger-lens/
 ├── data/
 │   ├── raw/              # PDF source documents
+│   ├── uploads/          # Temporary uploads (auto-cleanup)
 │   └── vectorstore/      # ChromaDB vector database
 ├── scripts/
 │   └── setup.py          # Data download and indexing
 ├── src/
 │   ├── database.py       # Vector store operations
 │   ├── graph.py          # LangGraph workflow definition
-│   ├── main.py           # FastAPI application
+│   ├── main.py           # FastAPI application (with upload support)
 │   ├── nodes.py          # Agent node implementations
 │   └── eval.py           # RAGAS evaluation suite
 ├── .env                  # Environment variables
 ├── requirements.txt      # Python dependencies
 └── README.md
 ```
+
+## How Upload & Analyze Works
+
+1. **Upload**: User sends PDF via multipart/form-data
+2. **Temporary Storage**: File saved to `data/uploads/`
+3. **Vectorization**: Document is chunked and embedded into a temporary vector store
+4. **Analysis**: LangGraph workflow processes the query
+   - Researcher retrieves relevant context
+   - Analyst synthesizes the answer
+   - Validator checks for hallucinations
+5. **Cleanup**: Temporary files and vector store automatically deleted
+6. **Response**: Validated answer returned with source attribution
 
 ## Tech Stack
 
@@ -167,10 +223,37 @@ ledger-lens/
 | API Framework | FastAPI |
 | Evaluation | RAGAS |
 
+## Key Improvements in Upload Feature
+
+✅ **No Pre-processing Required** — Upload and analyze in one request  
+✅ **Automatic Cleanup** — Temporary files deleted after analysis  
+✅ **Thread-Safe** — Each request uses isolated vector store  
+✅ **Flexible** — Works with any PDF annual report  
+✅ **Fast** — Optimized chunking and retrieval  
+
+## Tips for Best Results
+
+1. **Use text-based PDFs** (not scanned images)
+2. **Ask specific questions** with clear context
+3. **Include year/period** in your query when relevant
+4. **Use standard ticker symbols** (e.g., AAPL, GOOGL)
+
+## Limitations
+
+- Large PDFs (>50MB) may take longer to process
+- Each upload is processed independently (no session memory)
+- OCR PDFs may have reduced accuracy
+
 ## License
 
 MIT License
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## What's Next?
+
+- [ ] Add support for multiple file formats (DOCX, TXT)
+- [ ] Implement persistent session storage for uploaded documents
+- [ ] Add batch processing for multiple queries
+- [ ] Build web frontend for easier interaction
+- [ ] Add support for comparative analysis across multiple reports
