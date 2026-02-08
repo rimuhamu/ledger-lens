@@ -1,9 +1,14 @@
 import os
+import logging
 from typing import Any, Dict
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from database import Database
 from typing import TypedDict, List
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Define the state structure
 class AgentState(TypedDict):
@@ -40,13 +45,17 @@ def research_node(state: Dict[str, Any]):
     Research node
     Uses RAG to find facts in the document.
     """
-    print("--- RESEARCHING FINANCIAL DATA ---")
+    logger.info("--- RESEARCHING FINANCIAL DATA ---")
     question = state["question"]
+    logger.info(f"Question: {question}")
 
+    retriever = get_current_retriever()
     docs = retriever.invoke(question)
+    logger.info(f"Retrieved {len(docs)} documents")
     
     context = "\n\n".join([doc.page_content for doc in docs])
     contexts = [doc.page_content for doc in docs]  # List format for RAGAS
+    logger.info(f"Total context length: {len(context)} characters")
 
     return {
         "context": context,
