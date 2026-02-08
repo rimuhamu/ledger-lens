@@ -16,8 +16,24 @@ class AgentState(TypedDict):
 # Get the project root directory (parent of src/)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 db = Database(db_path=os.path.join(PROJECT_ROOT, "data", "vectorstore"))
-retriever = db.get_retriever()
+_default_retriever = db.get_retriever()
+_current_retriever = _default_retriever
+
 llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
+
+def set_retriever(new_retriever):
+    """Set a custom retriever (e.g., for uploaded documents)"""
+    global _current_retriever
+    _current_retriever = new_retriever
+
+def reset_retriever():
+    """Reset to the default retriever"""
+    global _current_retriever
+    _current_retriever = _default_retriever
+
+def get_current_retriever():
+    """Get the currently active retriever"""
+    return _current_retriever
 
 def research_node(state: Dict[str, Any]):
     """

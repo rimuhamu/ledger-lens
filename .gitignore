@@ -1,6 +1,8 @@
 # Data and local storage
 data/raw/*.pdf
-data/vectorstore/
+data/vectorstore
+data/uploads/
+*.pdf
 .venv/
 venv/
 __pycache__/

@@ -1,6 +1,13 @@
-from fastapi import FastAPI, HTTPException
+import os
+import shutil
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from pydantic import BaseModel
 from graph import app as agent_graph
+from database import Database
+
+# Directory for uploaded files
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(title="LedgerLens Analyst API")
 
@@ -10,7 +17,7 @@ class AnalysisRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "LedgerLens Analyst is Online", "model": "GPT-4o / LangGraph"}
+    return {"status": "LedgerLens Analyst is Online", "model": "GPT-4o-mini / LangGraph"}
 
 @app.post("/analyze")
 async def analyze_report(request: AnalysisRequest):
@@ -29,3 +36,69 @@ async def analyze_report(request: AnalysisRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/upload-and-analyze")
+async def upload_and_analyze(
+    file: UploadFile = File(...),
+    ticker: str = Form(...),
+    query: str = Form(...)
+):
+    """
+    Upload a PDF annual report and analyze it with a specific query.
+    
+    - **file**: PDF file to upload
+    - **ticker**: Company ticker symbol
+    - **query**: Question to ask about the report
+    """
+    # Validate file type
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    # Save uploaded file temporarily
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Create a temporary vector store for this document
+        temp_db_path = os.path.join(UPLOAD_DIR, f"vectorstore_{ticker}")
+        temp_db = Database(db_path=temp_db_path)
+        
+        # Ingest the uploaded document
+        success = temp_db.ingest_document(file_path)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to process the uploaded document")
+        
+        # Temporarily update the global retriever in nodes.py
+        from nodes import set_retriever
+        temp_retriever = temp_db.get_retriever()
+        set_retriever(temp_retriever)
+        
+        # Run the analysis
+        inputs = {"question": f"For {ticker}: {query}"}
+        result = await agent_graph.ainvoke(inputs)
+        
+        # Cleanup temporary files
+        os.remove(file_path)
+        shutil.rmtree(temp_db_path, ignore_errors=True)
+        
+        return {
+            "answer": result["answer"],
+            "verification_status": "PASS" if result["is_valid"] else "FAIL",
+            "metadata": {
+                "source": file.filename,
+                "ticker": ticker
+            }
+        }
+        
+    except Exception as e:
+        # Cleanup on error
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Reset to default retriever
+        from nodes import reset_retriever
+        reset_retriever()
