@@ -1,13 +1,3 @@
-"""
-JSON schema and models for the AI Intelligence Hub UI output.
-Converts financial analysis into structured data matching the UI components:
-- Key Highlights
-- Sentiment Score
-- Risk Level
-- Risk Factors
-- Suggested Questions
-"""
-
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 from enum import Enum

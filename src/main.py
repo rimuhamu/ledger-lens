@@ -46,6 +46,7 @@ async def upload_and_analyze(
 ):
     """
     Upload a PDF annual report and analyze it.
+    Includes real-time geopolitical risk analysis from external sources.
     
     - **file**: PDF file to upload
     - **ticker**: Company ticker symbol
