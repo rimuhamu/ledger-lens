@@ -15,7 +15,8 @@ Built with LangChain, LangGraph, and ChromaDB, it provides a FastAPI endpoint fo
 
 - 🔍 **RAG-based Document Search** — Semantic retrieval from PDF financial reports
 - 📤 **Dynamic Document Upload** — Upload and analyze any PDF report via API
-- 🤖 **Multi-Agent Workflow** — Research → Analyst → Validator pipeline with LangGraph
+- 🤖 **Multi-Agent Workflow** — Research → Analyst → Validator → Intelligence Hub pipeline
+- 🧠 **AI Intelligence Hub** — Structured output with sentiment scores, risk levels, and key highlights
 - ✅ **Built-in Verification** — Automatic hallucination detection and answer validation
 - 📈 **RAGAS Evaluation** — Comprehensive evaluation suite with industry-standard metrics
 - 🚀 **FastAPI Backend** — RESTful API for seamless integration
@@ -23,19 +24,23 @@ Built with LangChain, LangGraph, and ChromaDB, it provides a FastAPI endpoint fo
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Researcher │ ──▶ │   Analyst    │ ──▶ │  Validator  │
-│   (RAG)     │     │   (LLM)      │     │   (LLM)     │
-└─────────────┘     └──────────────┘     └──────┬──────┘
-                                                │
-                                    ┌───────────┴───────────┐
-                                    │                       │
-                                   PASS                   FAIL
-                                    │                       │
-                                    ▼                       │
-                                  [END]                     │
-                                                            ▼
-                                                    [Re-research]
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐     ┌──────────────────┐
+│  Researcher │ ──▶ │   Analyst    │ ──▶ │  Validator  │ ──▶ │ Intelligence Hub │
+│   (RAG)     │     │   (LLM)      │     │   (LLM)     │     │     (LLM)        │
+└─────────────┘     └──────────────┘     └──────┬──────┘     └────────┬─────────┘
+                                                │                     │
+                                               FAIL                  PASS
+                                                │                     │
+                                                ▼                     ▼
+                                        [Re-research]              [END]
+                                                                     │
+                                                         ┌───────────┴───────────┐
+                                                         │  Structured Output:   │
+                                                         │  • Key Highlights     │
+                                                         │  • Sentiment Score    │
+                                                         │  • Risk Level         │
+                                                         │  • Risk Factors       │
+                                                         └───────────────────────┘
 ```
 
 ## Installation
@@ -121,22 +126,20 @@ Content-Type: application/json
 }
 ```
 
-#### 3. 🆕 Upload & Analyze Any Report
+#### 3. Upload & Analyze Any Report
 ```bash
 POST /upload-and-analyze
 Content-Type: multipart/form-data
 
 file: <your-report.pdf>
 ticker: AAPL
-query: What was the total revenue in 2024?
 ```
 
 **Using cURL:**
 ```bash
 curl -X POST "http://localhost:8000/upload-and-analyze" \
   -F "file=@/path/to/report.pdf" \
-  -F "ticker=AAPL" \
-  -F "query=What was the total revenue in 2024?"
+  -F "ticker=AAPL"
 ```
 
 **Using Python:**
@@ -145,7 +148,7 @@ import requests
 
 url = "http://localhost:8000/upload-and-analyze"
 files = {'file': open('report.pdf', 'rb')}
-data = {'ticker': 'AAPL', 'query': 'What was the revenue?'}
+data = {'ticker': 'AAPL'}
 
 response = requests.post(url, files=files, data=data)
 print(response.json())
@@ -156,6 +159,33 @@ print(response.json())
 {
   "answer": "Apple's total revenue in 2024 was $394.3 billion...",
   "verification_status": "PASS",
+  "intelligence_hub": {
+    "key_highlights": [
+      {
+        "icon": "growth",
+        "text": "Revenue increased by 26.2% YoY, driven by Services growth.",
+        "metric_value": "26.2%"
+      }
+    ],
+    "sentiment": {
+      "score": 84,
+      "change": "+12%",
+      "description": "Strongly Bullish outlook based on product pipeline."
+    },
+    "risk": {
+      "level": "Low",
+      "description": "Supply chain diversification mitigates risks."
+    },
+    "risk_factors": [
+      {"icon": "globe", "name": "Geopolitical Restrictions", "severity": "MED"},
+      {"icon": "chain", "name": "Supply Chain Concentration", "severity": "LOW"}
+    ],
+    "suggested_questions": [
+      "Summarize the Services segment performance",
+      "What are the major capital expenditure plans?",
+      "Explain the R&D spending growth"
+    ]
+  },
   "metadata": {
     "source": "apple_annual_report.pdf",
     "ticker": "AAPL"
@@ -189,9 +219,10 @@ ledger-lens/
 ├── scripts/
 │   └── setup.py          # Data download and indexing
 ├── src/
+│   ├── analysis_schema.py # Pydantic models for Intelligence Hub output
 │   ├── database.py       # Vector store operations
 │   ├── graph.py          # LangGraph workflow definition
-│   ├── main.py           # FastAPI application (with upload support)
+│   ├── main.py           # FastAPI application
 │   ├── nodes.py          # Agent node implementations
 │   └── eval.py           # RAGAS evaluation suite
 ├── .env                  # Environment variables
@@ -201,15 +232,16 @@ ledger-lens/
 
 ## How Upload & Analyze Works
 
-1. **Upload**: User sends PDF via multipart/form-data
+1. **Upload**: User sends PDF via multipart/form-data with ticker symbol
 2. **Temporary Storage**: File saved to `data/uploads/`
 3. **Vectorization**: Document is chunked and embedded into a temporary vector store
-4. **Analysis**: LangGraph workflow processes the query
+4. **Analysis**: LangGraph workflow processes the document
    - Researcher retrieves relevant context
    - Analyst synthesizes the answer
    - Validator checks for hallucinations
+   - Intelligence Hub extracts structured insights
 5. **Cleanup**: Temporary files and vector store automatically deleted
-6. **Response**: Validated answer returned with source attribution
+6. **Response**: Validated answer with Intelligence Hub data returned
 
 ## Tech Stack
 
@@ -223,20 +255,19 @@ ledger-lens/
 | API Framework | FastAPI |
 | Evaluation | RAGAS |
 
-## Key Improvements in Upload Feature
+## Key Features
 
 ✅ **No Pre-processing Required** — Upload and analyze in one request  
 ✅ **Automatic Cleanup** — Temporary files deleted after analysis  
 ✅ **Thread-Safe** — Each request uses isolated vector store  
-✅ **Flexible** — Works with any PDF annual report  
+✅ **Structured Output** — Sentiment, risk, and highlights in JSON format  
 ✅ **Fast** — Optimized chunking and retrieval  
 
 ## Tips for Best Results
 
 1. **Use text-based PDFs** (not scanned images)
-2. **Ask specific questions** with clear context
-3. **Include year/period** in your query when relevant
-4. **Use standard ticker symbols** (e.g., AAPL, GOOGL)
+2. **Use standard ticker symbols** (e.g., AAPL, GOOGL)
+3. **Annual reports work best** — structured financial documents yield better insights
 
 ## Limitations
 
