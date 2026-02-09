@@ -23,6 +23,7 @@ def read_root():
 async def analyze_report(request: AnalysisRequest):
     """
     Triggers the multi-step reasoning agent to analyze the BCA 2024 report.
+    Returns structured intelligence hub data including sentiment, risk, and highlights.
     """
     try:
         inputs = {"question": f"For {request.ticker}: {request.query}"}
@@ -32,6 +33,7 @@ async def analyze_report(request: AnalysisRequest):
         return {
             "answer": result["answer"],
             "verification_status": "PASS" if result["is_valid"] else "FAIL",
+            "intelligence_hub": result.get("intelligence_hub_data", {}),
             "metadata": {"source": "BCA Annual Report 2024"}
         }
     except Exception as e:
@@ -40,15 +42,13 @@ async def analyze_report(request: AnalysisRequest):
 @app.post("/upload-and-analyze")
 async def upload_and_analyze(
     file: UploadFile = File(...),
-    ticker: str = Form(...),
-    query: str = Form(...)
+    ticker: str = Form(...)
 ):
     """
-    Upload a PDF annual report and analyze it with a specific query.
+    Upload a PDF annual report and analyze it.
     
     - **file**: PDF file to upload
     - **ticker**: Company ticker symbol
-    - **query**: Question to ask about the report
     """
     # Validate file type
     if not file.filename.endswith('.pdf'):
@@ -76,8 +76,8 @@ async def upload_and_analyze(
         temp_retriever = temp_db.get_retriever()
         set_retriever(temp_retriever)
         
-        # Run the analysis
-        inputs = {"question": f"For {ticker}: {query}"}
+        # Run the analysis with a comprehensive default question
+        inputs = {"question": f"Provide a comprehensive financial analysis for {ticker} including key highlights, financial performance, growth metrics, risk factors, and outlook."}
         result = await agent_graph.ainvoke(inputs)
         
         # Cleanup temporary files
@@ -87,6 +87,7 @@ async def upload_and_analyze(
         return {
             "answer": result["answer"],
             "verification_status": "PASS" if result["is_valid"] else "FAIL",
+            "intelligence_hub": result.get("intelligence_hub_data", {}),
             "metadata": {
                 "source": file.filename,
                 "ticker": ticker

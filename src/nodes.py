@@ -5,6 +5,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from database import Database
 from typing import TypedDict, List
+from langchain_core.output_parsers import PydanticOutputParser
+from analysis_schema import AIIntelligenceHubData
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -17,6 +19,7 @@ class AgentState(TypedDict):
     contexts: List[str]  # RAGAS expects a list of context strings
     answer: str
     is_valid: bool
+    intelligence_hub_data: dict  # Structured data for AI Intelligence Hub UI
 
 # Get the project root directory (parent of src/)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -122,3 +125,76 @@ def validator_node(state: Dict[str, Any]):
     is_valid = "PASS" in verification.content.upper()
 
     return {"is_valid": is_valid}
+
+def intelligence_hub_node(state: Dict[str, Any]):
+    """
+    Intelligence Hub Node
+    Generates structured JSON output for the AI Intelligence Hub UI.
+    Extracts key highlights, sentiment score, risk level, and risk factors.
+    """
+    print("--- GENERATING INTELLIGENCE HUB DATA ---")
+    context = state["context"]
+    question = state.get("question", "")
+    answer = state.get("answer", "")
+
+    # Set up the Pydantic output parser
+    parser = PydanticOutputParser(pydantic_object=AIIntelligenceHubData)
+
+    prompt = ChatPromptTemplate.from_template("""
+You are a financial intelligence analyst. Analyze the provided context and answer to generate a structured intelligence report.
+
+Context from financial documents:
+{context}
+
+Analysis Question: {question}
+
+Previous Analysis Answer: {answer}
+
+Based on the above, generate a comprehensive intelligence hub report with:
+
+1. **Key Highlights** (3-5 highlights): Extract the most important financial metrics and events.
+   - Each highlight should have an icon type: "growth" for positive growth, "chart" for metrics, "calendar" for dates/events, "alert" for warnings, "check" for achievements
+   - Include the specific metric value when available (e.g., "26.2%", "$5.2B")
+
+2. **Sentiment Score** (0-100): Rate the overall sentiment based on:
+   - Financial performance indicators
+   - Growth trajectory
+   - Management outlook
+   - Market positioning
+   - Provide the change as a percentage (e.g., "+12%" for bullish, "-8%" for bearish)
+   - Describe the sentiment briefly (e.g., "Strongly Bullish outlook based on R&D pipeline")
+
+3. **Risk Level**: Overall assessment - "Low", "Moderate", or "High"
+   - Provide a brief explanation
+
+4. **Risk Factors** (2-4 factors): Identify specific risks with severity levels
+   - Each risk should have an icon: "globe" for geopolitical, "chain" for supply chain, "dollar" for financial, "alert" for general, "chart" for market
+   - Severity must be: "LOW", "MED", or "HIGH"
+
+5. **Suggested Questions** (3 questions): Based on the analysis, suggest follow-up questions the user might want to ask.
+
+{format_instructions}
+""")
+
+    chain = prompt | llm | parser
+
+    try:
+        result = chain.invoke({
+            "context": context,
+            "question": question,
+            "answer": answer,
+            "format_instructions": parser.get_format_instructions()
+        })
+        return {"intelligence_hub_data": result.model_dump()}
+    except Exception as e:
+        logger.error(f"Error generating intelligence hub data: {e}")
+        # Return a default structure on error
+        return {
+            "intelligence_hub_data": {
+                "key_highlights": [],
+                "sentiment": {"score": 50, "change": "0%", "description": "Unable to analyze sentiment"},
+                "risk": {"level": "Moderate", "description": "Analysis unavailable"},
+                "risk_factors": [],
+                "suggested_questions": ["What is the company's financial performance?"]
+            }
+        }

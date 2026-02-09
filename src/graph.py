@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from nodes import research_node, analyst_node, validator_node, AgentState
+from nodes import research_node, analyst_node, validator_node, intelligence_hub_node, AgentState
 
 # Define the workflow
 workflow = StateGraph(AgentState)
@@ -8,6 +8,7 @@ workflow = StateGraph(AgentState)
 workflow.add_node("researcher", research_node)
 workflow.add_node("analyst", analyst_node)
 workflow.add_node("validator", validator_node)
+workflow.add_node("intelligence_hub", intelligence_hub_node)
 
 # Define the flow
 workflow.add_edge(START, "researcher")
@@ -15,7 +16,8 @@ workflow.add_edge("researcher", "analyst")
 workflow.add_edge("analyst", "validator")
 workflow.add_conditional_edges(
     "validator",
-    lambda state: "researcher" if not state["is_valid"] else END
+    lambda state: "researcher" if not state["is_valid"] else "intelligence_hub"
 )
+workflow.add_edge("intelligence_hub", END)
 
 app = workflow.compile()
