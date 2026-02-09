@@ -17,6 +17,7 @@ Built with LangChain, LangGraph, and ChromaDB, it provides a FastAPI endpoint fo
 - 📤 **Dynamic Document Upload** — Upload and analyze any PDF report via API
 - 🤖 **Multi-Agent Workflow** — Research → Analyst → Validator → Intelligence Hub pipeline
 - 🧠 **AI Intelligence Hub** — Structured output with sentiment scores, risk levels, and key highlights
+- 🌐 **Real-time Geopolitical Risks** — External data from NewsAPI, World Bank, and GDELT
 - ✅ **Built-in Verification** — Automatic hallucination detection and answer validation
 - 📈 **RAGAS Evaluation** — Comprehensive evaluation suite with industry-standard metrics
 - 🚀 **FastAPI Backend** — RESTful API for seamless integration
@@ -77,6 +78,7 @@ Built with LangChain, LangGraph, and ChromaDB, it provides a FastAPI endpoint fo
    Create a `.env` file in the project root:
    ```env
    OPENAI_API_KEY=your-openai-api-key
+   NEWS_API_KEY=your-newsapi-key  # Optional: for real-time geopolitical news
    ```
 
 5. **Run setup script**
@@ -219,12 +221,13 @@ ledger-lens/
 ├── scripts/
 │   └── setup.py          # Data download and indexing
 ├── src/
-│   ├── analysis_schema.py # Pydantic models for Intelligence Hub output
-│   ├── database.py       # Vector store operations
-│   ├── graph.py          # LangGraph workflow definition
-│   ├── main.py           # FastAPI application
-│   ├── nodes.py          # Agent node implementations
-│   └── eval.py           # RAGAS evaluation suite
+│   ├── analysis_schema.py     # Pydantic models for Intelligence Hub
+│   ├── database.py            # Vector store operations
+│   ├── geopolitical_service.py # External risk data fetching
+│   ├── graph.py               # LangGraph workflow definition
+│   ├── main.py                # FastAPI application
+│   ├── nodes.py               # Agent node implementations
+│   └── eval.py                # RAGAS evaluation suite
 ├── .env                  # Environment variables
 ├── requirements.txt      # Python dependencies
 └── README.md
@@ -235,13 +238,14 @@ ledger-lens/
 1. **Upload**: User sends PDF via multipart/form-data with ticker symbol
 2. **Temporary Storage**: File saved to `data/uploads/`
 3. **Vectorization**: Document is chunked and embedded into a temporary vector store
-4. **Analysis**: LangGraph workflow processes the document
-   - Researcher retrieves relevant context
-   - Analyst synthesizes the answer
+4. **Geopolitical Enrichment**: Country detected from document, external risk data fetched
+5. **Analysis**: LangGraph workflow processes the document
+   - Researcher retrieves relevant context + external geopolitical data
+   - Analyst synthesizes the answer with risk awareness
    - Validator checks for hallucinations
    - Intelligence Hub extracts structured insights
-5. **Cleanup**: Temporary files and vector store automatically deleted
-6. **Response**: Validated answer with Intelligence Hub data returned
+6. **Cleanup**: Temporary files and vector store automatically deleted
+7. **Response**: Validated answer with Intelligence Hub data returned
 
 ## Tech Stack
 
@@ -253,15 +257,17 @@ ledger-lens/
 | Vector Store | ChromaDB |
 | Document Loader | PyMuPDF |
 | API Framework | FastAPI |
+| Geopolitical Data | NewsAPI, World Bank, GDELT |
 | Evaluation | RAGAS |
 
 ## Key Features
 
 ✅ **No Pre-processing Required** — Upload and analyze in one request  
+✅ **Real-time Risk Data** — Geopolitical risks from multiple external sources  
 ✅ **Automatic Cleanup** — Temporary files deleted after analysis  
 ✅ **Thread-Safe** — Each request uses isolated vector store  
 ✅ **Structured Output** — Sentiment, risk, and highlights in JSON format  
-✅ **Fast** — Optimized chunking and retrieval  
+✅ **Retry Logic** — Graceful handling of rate-limited APIs  
 
 ## Tips for Best Results
 
