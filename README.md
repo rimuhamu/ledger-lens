@@ -210,6 +210,41 @@ This runs the agent against predefined test cases and outputs metrics including:
 - **Context Recall** — How much of the ground truth is captured?
 - **Context Precision** — Are relevant contexts ranked higher?
 
+## Deployment
+
+The API can be easily deployed using Docker.
+
+### Using Docker Compose (Recommended)
+
+1. **Build and start the container**
+   ```bash
+   docker-compose up --build -d
+   ```
+
+2. **Access the API**
+   The API will be available at `http://localhost:8000`.
+   You can verify it's running with:
+   ```bash
+   curl http://localhost:8000/
+   ```
+
+3. **Stop the container**
+   ```bash
+   docker-compose down
+   ```
+
+### Using standard Docker
+
+1. **Build the image**
+   ```bash
+   docker build -t ledger-lens-api .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run -d -p 8000:8000 --env-file .env -v $(pwd)/data:/app/data ledger-lens-api
+   ```
+
 ## Project Structure
 
 ```
@@ -289,8 +324,6 @@ MIT License
 
 ## What's Next?
 
-- [ ] Add support for multiple file formats (DOCX, TXT)
 - [ ] Implement persistent session storage for uploaded documents
-- [ ] Add batch processing for multiple queries
 - [ ] Build web frontend for easier interaction
 - [ ] Add support for comparative analysis across multiple reports
