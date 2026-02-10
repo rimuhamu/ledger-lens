@@ -150,9 +150,6 @@ async def upload_document(
             ticker=ticker,
             filename=file.filename,
         )
-        
-        # Cleanup temp file (embeddings saved in Pinecone, PDF in S3)
-        os.remove(file_path)
 
         # Define a broad question to extract key metrics
         analysis_question = "Analyze the financial performance, key risks, and strategic outlook for this period."
@@ -160,7 +157,7 @@ async def upload_document(
         # Retrieve context for this document
         # Retry logic for reading from Pinecone (eventual consistency)
         import time
-        max_retries = 3
+        max_retries = 10  # Increased for eventual consistency
         contexts = []
         for i in range(max_retries):
             contexts = db.query_documents(
@@ -174,7 +171,8 @@ async def upload_document(
             time.sleep(2)  # Wait for indexing
         
         if not contexts:
-            print(f"Warning: No context found for analysis after {max_retries} retries.")
+            print(f"Warning: No context found for analysis after {max_retries} attempts.")
+
 
         intelligence_data = {}
         if contexts:
@@ -182,7 +180,8 @@ async def upload_document(
             state = {
                 "question": analysis_question,
                 "context": "\n\n".join([c["content"] for c in contexts]),
-                "contexts": [c["content"] for c in contexts]
+                "contexts": [c["content"] for c in contexts],
+                "document_id": result["document_id"]
             }
             analysis_result = await agent_graph.ainvoke(state)
             intelligence_data = analysis_result.get("intelligence_hub_data", {})
@@ -237,7 +236,8 @@ async def analyze_saved_document(
         state = {
             "question": request.query,
             "context": "\n\n".join([c["content"] for c in contexts]),
-            "contexts": [c["content"] for c in contexts]
+            "contexts": [c["content"] for c in contexts],
+            "document_id": document_id
         }
         
         result = await agent_graph.ainvoke(state)

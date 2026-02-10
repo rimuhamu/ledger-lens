@@ -78,9 +78,11 @@ def research_node(state: Dict[str, Any]):
     try:
         geo_service = get_geopolitical_service()
         
-        # Try to identify country from ticker first, then context/question
-        ticker = chunks[0]["ticker"] if chunks else None
-        country = _extract_country_from_text(context + " " + question, ticker)
+        # Try to identify country from ticker and filename using LLM
+        ticker = chunks[0].get("ticker") if chunks else None
+        filename = chunks[0].get("filename") if chunks else None
+        
+        country = _identify_country_with_llm(ticker, filename)
         
         if country:
             logger.info(f"Fetching geopolitical risks for: {country}")
@@ -110,103 +112,43 @@ def research_node(state: Dict[str, Any]):
     }
 
 
-def _extract_country_from_text(text: str, ticker: str = None) -> str:
+def _identify_country_with_llm(ticker: str = None, filename: str = None) -> str:
     """
-    Extract country name from text using ticker and keyword matching.
-    Prioritizes ticker-based detection for major exchanges.
+    Identify country using LLM based on ticker and filename.
+    Removes hardcoded lists in favor of dynamic AI reasoning.
     """
-    if ticker:
-        ticker_upper = ticker.upper()
-        if ticker_upper in ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NVDA", "NFLX", "AMD", "INTC"]:
-            return "united states"
-
-    text_lower = text.lower()
-    
-    priority_countries = {
-        "indonesia": [
-            "indonesia", "indonesian", "jakarta", "bandung", "surabaya",
-            "rupiah", "idr", "idx", "bei", "bank indonesia", "ojk", 
-            "bca", "bri", "bni", "mandiri", "telkom" 
-        ],
-        "united states": [
-            "united states", "u.s.", "usa", "america", "american",
-            "new york", "california", "nasdaq", "nyse", "sec",
-            "usd", "dollar", "fed", "federal reserve", "apple", "microsoft", "google"
-        ],
-        "china": [
-            "china", "chinese", "beijing", "shanghai", "shenzhen",
-            "yuan", "rmb", "cny", "hong kong", "hkd"
-        ],
-        "singapore": [
-            "singapore", "singaporean", "sgx", "sgd", "mas"
-        ],
-        "malaysia": [
-            "malaysia", "malaysian", "kuala lumpur", "klse", "bursa",
-            "ringgit", "myr", "bank negara"
-        ],
-        "thailand": [
-            "thailand", "thai", "bangkok", "baht", "thb", "set"
-        ],
-        "vietnam": [
-            "vietnam", "vietnamese", "hanoi", "ho chi minh", "dong", "vnd"
-        ],
-        "philippines": [
-            "philippines", "philippine", "manila", "peso", "php", "pse"
-        ],
-        "japan": [
-            "japan", "japanese", "tokyo", "osaka", "yen", "jpy",
-            "nikkei", "tse", "boj"
-        ],
-        "india": [
-            "india", "indian", "mumbai", "delhi", "bangalore",
-            "rupee", "inr", "nse", "bse", "rbi"
-        ],
-        "south korea": [
-            "south korea", "korea", "korean", "seoul", "won", "krw", "kospi"
-        ],
-        "australia": [
-            "australia", "australian", "sydney", "melbourne",
-            "aud", "asx", "rba"
-        ],
-        "united kingdom": [
-            "united kingdom", "uk", "britain", "british", "london",
-            "pound", "sterling", "gbp", "lse", "ftse"
-        ],
-        "germany": [
-            "germany", "german", "frankfurt", "berlin", "munich",
-            "euro", "eur", "dax"
-        ],
-        "france": [
-            "france", "french", "paris", "euro", "eur", "cac"
-        ],
-        "brazil": [
-            "brazil", "brazilian", "sao paulo", "real", "brl", "bovespa"
-        ],
-        "mexico": [
-            "mexico", "mexican", "peso", "mxn"
-        ],
-        "canada": [
-            "canada", "canadian", "toronto", "cad", "tsx"
-        ]
-    }
-    
-    country_scores = {}
-    for country, keywords in priority_countries.items():
-        score = 0
-        for keyword in keywords:
-            if len(keyword) <= 3:
-                import re
-                pattern = r'\b' + re.escape(keyword) + r'\b'
-                score += len(re.findall(pattern, text_lower))
-            else:
-                score += text_lower.count(keyword)
-        if score > 0:
-            country_scores[country] = score
-    
-    if country_scores:
-        return max(country_scores, key=country_scores.get)
-    
-    return None
+    if not ticker and not filename:
+        return None
+        
+    try:
+        prompt = ChatPromptTemplate.from_template("""
+        Identify the primary country where this company is headquartered based on the following information:
+        Ticker: {ticker}
+        Filename: {filename}
+        
+        Return ONLY the country name in lowercase (e.g., "united states", "indonesia", "china").
+        If you are unsure or cannot identify the country, return "None".
+        Do not add any explanation or punctuation.
+        """)
+        
+        chain = prompt | llm
+        
+        response = chain.invoke({
+            "ticker": ticker if ticker else "Unknown",
+            "filename": filename if filename else "Unknown"
+        })
+        
+        country = response.content.strip().lower()
+        
+        if country == "none" or not country:
+            return None
+            
+        logger.info(f"LLM identified country: {country} (Ticker: {ticker}, File: {filename})")
+        return country
+        
+    except Exception as e:
+        logger.error(f"Error in AI country identification: {e}")
+        return None
 
 
 def analyst_node(state: Dict[str, Any]):
