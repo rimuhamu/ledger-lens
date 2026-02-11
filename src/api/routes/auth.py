@@ -62,7 +62,7 @@ async def login(body: UserLogin):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get the currently authenticated user's profile."""
-    # Convert legacy User model to Pydantic schema if needed, or if fields match it works automatically
+    
     return UserResponse(
         id=current_user.id,
         email=current_user.email,

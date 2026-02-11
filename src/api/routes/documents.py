@@ -16,8 +16,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 import uuid
 
-# We need a Pydantic schema for Document List response if not already defined
-# src/domain/schemas/document.py has DocumentResponse
 
 from src.domain.schemas.document import DocumentResponse, DocumentIngestResponse
 
@@ -33,14 +31,7 @@ async def upload_document(
     current_user: User = Depends(get_current_user),
     vector_store: VectorStore = Depends(get_vector_store),
     object_store: ObjectStore = Depends(get_object_store),
-    # db is used in legacy for "ingest_document" which did everything
-    # We should refactor ingestion logic to a service or proper infrastructure usage.
-    # For this step, I might need to reproduce `ingest_document` logic here or in a service.
-    # The Legacy `database.py` had `ingest_document`.
-    # Phase 2 created `PineconeVectorStore` and `S3ObjectStore`.
-    # We need to glue them together.
-    # I'll create `DocumentService` or put logic here for now to match strict plan.
-    # Plan says: "Uses ObjectStore and VectorStore via dependencies".
+
 ):
     user_id = current_user.id
     
@@ -50,23 +41,15 @@ async def upload_document(
     file_path = os.path.join(UPLOAD_DIR, file.filename)
     
     try:
-         # Save temporarily
+        # Save file temporarily for processing
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # 1. Upload to Object Store (S3)
+        # Upload to S3
         s3_key = f"{user_id}/{file.filename}"
         object_store.upload_file(file_path, s3_key)
         
-        # 2. Ingest to Vector Store (Pinecone)
-        # We need to parse PDF first.
-        # Legacy `database.py` used `PyPDFLoader` and `RecursiveCharacterTextSplitter`.
-        # I should probably move that logic to `src/utils/document_processor.py` or similar.
-        # But to keep it simple and actionable, I'll allow inline import or helper method here.
-        # Legacy dependencies: langchain_community.document_loaders, langchain_text_splitters
-        
-        
-        # loader = PyPDFLoader(file_path) # these are now imported at top
+        # Parse PDF and split into chunks
 
         
         loader = PyPDFLoader(file_path)
@@ -78,15 +61,10 @@ async def upload_document(
         )
         chunks = text_splitter.split_documents(pages)
         
-        # Prepare vectors with OpenAI Embeddings
-        # Note: PineconeVectorStore.upsert expects dicts with values/metadata 
-        # OR we use the LangChain pinecone wrapper if we want.
-        # But our interface says `upsert(vectors: List[Dict])`.
-        # `PineconeVectorStore` implementation uses `self.index.upsert(vectors=batch)`.
-        # So we need to format for Pinecone: (id, values, metadata).
+        # Generate embeddings and prepare vectors for Pinecone
         
         embeddings = OpenAIEmbeddings()
-        # Embed all texts
+
         texts = [chunk.page_content for chunk in chunks]
         vectors = embeddings.embed_documents(texts)
         
@@ -113,7 +91,7 @@ async def upload_document(
             
         vector_store.upsert(upsert_batch)
         
-        # Cleanup temp file
+        # Clean up temp file
         if os.path.exists(file_path):
             os.remove(file_path)
             
@@ -140,11 +118,10 @@ async def list_documents(
     """
     user_id = current_user.id
     
-    # Use Pinecone's query with dummy vector to retrieve metadata
-    # We need a dummy vector of correct dimension (1536 for OpenAI)
+    # Query with dummy vector (1536-dim for OpenAI) to retrieve document metadata
     dummy_vector = [0.0] * 1536
     
-    # Query with metadata filter for user_id
+
     try:
         results = vector_store.query(
             vector=dummy_vector,
@@ -157,7 +134,7 @@ async def list_documents(
         seen = set()
         documents = []
         
-        # Handle Pinecone results structure
+
         matches = getattr(results, 'matches', [])
         
         for match in matches:
@@ -179,7 +156,7 @@ async def list_documents(
         
         return documents
     except Exception as e:
-        # In case of pinecone error or connection issue
+
         print(f"Error listing documents: {e}")
         return []
 

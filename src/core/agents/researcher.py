@@ -19,7 +19,6 @@ class Researcher(BaseAgent[AnalysisState]):
         document_id = state.get("document_id")
         
         # Determine country for geopolitical risks
-        # (Simplified logic - could use LLM here too)
         geopolitical_context = ""
         # TODO: Add logic to extract country if needed, for now skipping complex extraction
         
@@ -33,14 +32,7 @@ class Researcher(BaseAgent[AnalysisState]):
             filter={"document_id": document_id} if document_id else None
         )
         
-        # Extract content
-        # Note: VectorStore.query returns implementation-specific result (Pinecone QueryResponse)
-        # We need to adapt it. 
-        # Ideally, the VectorStore interface should return a standard Dict.
-        # Let's assume PineconeVectorStore returns a list of matches or we parse it there.
-        # But `src/infrastructure/storage/vector/pinecone.py` returns `self.index.query(...)`.
-        # This returns a Pinecone Object.
-        
+        # Extract text content from query results
         chunks = []
         if hasattr(results, 'matches'):
             for match in results.matches:
