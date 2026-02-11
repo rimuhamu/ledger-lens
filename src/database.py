@@ -22,10 +22,10 @@ class Database:
     """
     Database class managing both vector storage (Pinecone) and file storage (S3).
     
-    Features:
-    - Pinecone for semantic search with metadata filtering
-    - S3 for persistent PDF storage
-    - User-scoped document management
+    IMPROVEMENTS FOR FINANCIAL REPORTS:
+    - Larger chunk sizes to preserve financial tables
+    - Better text extraction logging
+    - Smarter chunking strategy for structured data
     """
     
     def __init__(self):
@@ -135,6 +135,11 @@ class Database:
         """
         Ingest a PDF document into Pinecone and S3.
         
+        IMPROVED FOR FINANCIAL REPORTS:
+        - Larger chunks (2000 chars) to preserve financial tables
+        - Better separator strategy for structured data
+        - Enhanced logging to debug extraction issues
+        
         Args:
             file_path: Path to the PDF file
             user_id: User identifier
@@ -154,19 +159,36 @@ class Database:
         self._upload_to_s3(file_path, s3_key)
         
         try:
-            # Load and chunk the document
+            # Load and chunk the document with improved settings for financial data
+            logger.info(f"Loading PDF: {file_path}")
             loader = PyMuPDFLoader(file_path)
             documents = loader.load()
             
+            logger.info(f"Loaded {len(documents)} pages from PDF")
+            
+            # Log a sample of extracted text for debugging
+            if documents:
+                sample_text = documents[0].page_content[:500]
+                logger.info(f"Sample text from first page: {sample_text}...")
+            
+            # IMPROVED CHUNKING STRATEGY for financial reports
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200,
+                chunk_size=2000,  # Larger to preserve financial tables
+                chunk_overlap=400,  # More overlap to maintain context across chunks
                 length_function=len,
+                # Better separators to preserve structure
+                separators=["\n\n\n", "\n\n", "\n", ". ", " ", ""],
             )
             chunks = text_splitter.split_documents(documents)
             
             if not chunks:
                 raise ValueError("No content extracted from PDF")
+            
+            logger.info(f"Created {len(chunks)} chunks from document")
+            
+            # Log first chunk for debugging
+            if chunks:
+                logger.info(f"First chunk preview: {chunks[0].page_content[:300]}...")
             
             # Generate all embeddings in batch
             texts = [chunk.page_content for chunk in chunks]
@@ -199,6 +221,7 @@ class Database:
             for i in range(0, len(vectors), batch_size):
                 batch = vectors[i:i + batch_size]
                 self.index.upsert(vectors=batch)
+                logger.info(f"Upserted batch {i//batch_size + 1}/{(len(vectors)-1)//batch_size + 1}")
             
             logger.info(f"✓ Ingested {len(chunks)} chunks for document {document_id}")
             
@@ -211,7 +234,7 @@ class Database:
             }
             
         except Exception as e:
-            logger.error(f"Error ingesting document: {e}")
+            logger.error(f"Error ingesting document: {e}", exc_info=True)
             # Cleanup S3 if ingestion failed
             try:
                 self.s3_client.delete_object(Bucket=self.bucket_name, Key=s3_key)
@@ -230,6 +253,8 @@ class Database:
         """
         Query documents with optional filtering.
         
+        IMPROVED: Better logging to debug retrieval issues
+        
         Args:
             query: Search query
             user_id: Filter by user (optional)
@@ -240,6 +265,8 @@ class Database:
         Returns:
             List of matching chunks with content and metadata
         """
+        logger.info(f"Querying documents with: query='{query[:100]}...', document_id={document_id}, ticker={ticker}")
+        
         # Generate query embedding
         query_embedding = self.embeddings.embed_query(query)
         
@@ -253,6 +280,8 @@ class Database:
         if ticker:
             filter_dict["ticker"] = ticker.upper()
         
+        logger.info(f"Filter: {filter_dict}")
+        
         # Query Pinecone
         results = self.index.query(
             vector=query_embedding,
@@ -263,9 +292,12 @@ class Database:
         
         # Extract and format results
         chunks = []
-        for match in results.matches:
+        for i, match in enumerate(results.matches):
+            chunk_content = match.metadata["text"]
+            logger.info(f"Match {i+1} (score={match.score:.3f}): {chunk_content[:150]}...")
+            
             chunks.append({
-                "content": match.metadata["text"],
+                "content": chunk_content,
                 "score": match.score,
                 "document_id": match.metadata["document_id"],
                 "ticker": match.metadata["ticker"],
@@ -273,6 +305,8 @@ class Database:
                 "chunk_index": match.metadata["chunk_index"],
                 "s3_key": match.metadata.get("s3_key", "")
             })
+        
+        logger.info(f"Retrieved {len(chunks)} chunks")
         
         return chunks
     

@@ -243,114 +243,133 @@ def intelligence_hub_node(state: Dict[str, Any]):
     full_context = context
     if geopolitical_context:
         full_context += "\n\n" + geopolitical_context
+    
+    # Log what we're sending to the LLM for debugging
+    logger.info(f"Context length: {len(full_context)} characters")
+    logger.info(f"Context preview (first 500 chars):\n{full_context[:500]}")
+    logger.info(f"Context preview (last 500 chars):\n{full_context[-500:]}")
 
     # Set up the Pydantic output parser
     parser = PydanticOutputParser(pydantic_object=AIIntelligenceHubData)
 
     prompt = ChatPromptTemplate.from_template("""
-You are a financial intelligence analyst. Analyze the provided context and answer to generate a structured intelligence report based ONLY on the actual information found in the documents and external data sources.
+You are a financial intelligence analyst. Your task is to extract REAL financial metrics and insights from the provided context.
+
+**CRITICAL RULES:**
+1. ONLY use numbers and facts that ACTUALLY appear in the context below
+2. DO NOT invent, estimate, or use placeholder values
+3. If a specific metric isn't in the context, find similar metrics that ARE present
+4. Be flexible - extract whatever financial metrics are available
 
 Context from financial documents:
 {context}
 
 Analysis Question: {question}
-
 Previous Analysis Answer: {answer}
 
-CRITICAL INSTRUCTIONS:
-- Extract ALL values directly from the provided context - DO NOT use placeholder or example values
-- Base the sentiment score on actual performance metrics found in the documents
-- Identify REAL risk factors mentioned in the context OR provided by external geopolitical data sources
-- When external geopolitical data is available (marked as "EXTERNAL GEOPOLITICAL RISK DATA"), incorporate those risks into your risk_factors section
-- Every number, percentage, and claim must be traceable to the actual context or external data
-- If specific information is not available, acknowledge gaps appropriately
+**YOUR TASK:**
 
-Generate a comprehensive intelligence hub report with:
+Extract a comprehensive intelligence report with the following sections:
 
-1. **Key Highlights** (3-5 highlights): 
-   You MUST attempt to extract the following 3 specific metrics if available in the text:
-   - **YoY Revenue Growth** (icon: "growth")
-   - **Operating Margin** (icon: "chart")
-   - **Free Cash Flow** (icon: "dollar")
-   
-   If these specific metrics are found, format them as:
-   - text: "Revenue grew by [X]%, driven by..."
-   - metric_value: "[X]%" (e.g., "15.3%", "$4.2B")
-   
-   If not found, extract other SIGNIFICANT financial events (stock splits, major acquisitions, etc.).
-   
-   - Icon types: "growth" for positive metrics, "chart" for financial metrics, "calendar" for time-based events, "alert" for warnings/challenges, "check" for achievements
-   - Include the EXACT metric value from the context in the `metric_value` field. THIS IS MANDATORY if a number exists.
-   - Example format: "Total loans reached Rp921.9 trillion, up 13.8% YoY" (using actual numbers from context)
-   - DO NOT use generic statements - be specific with actual figures
+## 1. KEY HIGHLIGHTS (3-5 items)
 
-2. **Sentiment Score** (0-100): Calculate based ONLY on ACTUAL indicators found in the context:
-   - Analyze real financial performance (revenue growth, profitability, margins)
-   - Consider actual growth trajectory mentioned in documents
-   - Review management's stated outlook if available
-   - Evaluate market position based on context
-   - Scoring guide: 
-     * 0-30 (Bearish): Declining metrics, losses, negative outlook
-     * 31-55 (Neutral): Flat growth, mixed signals
-     * 56-75 (Moderately Bullish): Solid growth, positive trends
-     * 76-100 (Strongly Bullish): Exceptional growth, strong fundamentals
-   - Change percentage should reflect actual YoY comparisons if available, otherwise estimate based on trend direction
-   - Description must reference specific context evidence (e.g., "Bullish based on 18% loan growth and expanding margins to 72.5%")
-   - DO NOT use generic sentiment descriptions
+Look for ANY of these types of metrics in the context:
+- Revenue figures and growth rates
+- Profit/earnings numbers  
+- Margin percentages (gross margin, operating margin, net margin)
+- Cash flow data
+- Major business events (acquisitions, product launches, restructuring)
+- Segment performance data
+- Key operational metrics
 
-3. **Risk Level**: Overall assessment based on ACTUAL risks mentioned in context or external data
-   - "Low": Strong fundamentals with minimal concerns mentioned in documents
-   - "Moderate": Some challenges noted but appear manageable based on context
-   - "High": Significant risks, challenges, or adverse conditions discussed
-   - Explanation must cite specific evidence from context or external sources (e.g., "Moderate due to regulatory changes mentioned in report and recent trade tensions from external data")
+**INSTRUCTIONS:**
+- For EACH highlight, include the EXACT number/percentage from the context in the `metric_value` field
+- The `text` field should explain the metric in context
+- Choose appropriate icons:
+  * "growth" - for revenue/growth metrics
+  * "chart" - for margins/profitability  
+  * "dollar" - for cash/financial metrics
+  * "calendar" - for time-based events
+  * "check" - for achievements/milestones
 
-4. **Risk Factors** (2-4 factors): Identify SPECIFIC risks from TWO SOURCES:
-   
-   A. DOCUMENT-BASED RISKS: Extract from the financial documents
-   - Look for risks mentioned in risk sections, MD&A, footnotes, or business discussions
-   
-   B. EXTERNAL GEOPOLITICAL RISKS: If "EXTERNAL GEOPOLITICAL RISK DATA" section is present in context
-   - Use the actual risks provided by external APIs (NewsAPI, World Bank, GDELT)
-   - These come from real-time data and should be included when available
-   - Format them appropriately with correct icons and severity levels
-   
-   IMPORTANT RULES:
-   - DO NOT fabricate generic examples (like "Supply Chain Concentration" unless actually mentioned)
-   - External geopolitical risks from APIs are REAL DATA and should be included
-   - Prioritize HIGH severity risks, then MED, then LOW
-   - Icon selection based on actual risk type identified:
-     * "globe": Geopolitical, regulatory, or international risks (use for external geopolitical data)
-     * "chain": Supply chain, operational, or logistics risks
-     * "dollar": Financial, liquidity, or currency risks
-     * "alert": General business or emerging risks
-     * "chart": Market volatility or competitive risks
-   - Severity from external data sources is already provided - use it as-is
-   - If a risk comes from external data, you can reference it like: "Economic Sanctions [HIGH] - Real-time geopolitical monitoring indicates..."
-   
-   Examples of proper extraction:
-   - Document mentions "credit risk increased due to NPL": {{"icon": "dollar", "name": "Credit Risk Exposure", "severity": "HIGH"}}
-   - External data shows "Economic Sanctions [HIGH]": {{"icon": "globe", "name": "Economic Sanctions", "severity": "HIGH"}}
-   - Document mentions "supply chain pressures": {{"icon": "chain", "name": "Supply Chain Pressures", "severity": "MED"}}
+**Example (if context mentions "Revenue was $130.5 billion, up 114% year-over-year"):**
+{{
+  "icon": "growth",
+  "text": "Revenue surged to $130.5 billion, driven by exceptional data center demand",
+  "metric_value": "114%"
+}}
 
-5. **Suggested Questions** (3 questions): Generate relevant follow-up questions based on:
-   - Specific topics mentioned in the context that could use deeper analysis
-   - Related financial aspects that would naturally follow from the current analysis
-   - Areas partially covered that could be expanded (e.g., if growth is mentioned, ask about drivers)
-   - If external geopolitical risks were identified, suggest questions to explore their impact
-   - Make questions SPECIFIC to the actual company/report, not generic templates
-   - Examples: 
-     * "What drove the 13.8% loan growth in 2024?" (if loan growth mentioned)
-     * "How might recent trade sanctions impact revenue in key markets?" (if geopolitical risks found)
-     * NOT: "What are the company's growth strategies?" (too generic)
+## 2. SENTIMENT SCORE (0-100)
+
+Base the sentiment score on ACTUAL performance indicators in the context:
+- Look for growth rates, profitability trends, management commentary
+- Positive indicators: high growth rates (>20%), expanding margins, positive outlook statements
+- Negative indicators: declining growth, shrinking margins, risk warnings
+
+Scoring guide:
+- 76-100: Exceptional growth (>50% YoY), strong profitability, very positive outlook
+- 56-75: Solid growth (10-50% YoY), healthy margins, positive trends
+- 31-55: Moderate growth (0-10%), mixed signals
+- 0-30: Declining metrics, losses, negative outlook
+
+**The `change` field** should reflect YoY sentiment shift if mentioned, or estimate based on growth trends.
+
+**The `description` field** must cite specific evidence from context (e.g., "Bullish based on 114% revenue growth and 75% gross margin expansion")
+
+## 3. RISK LEVEL
+
+Choose ONE: "Low", "Moderate", or "High"
+
+Base this on:
+- Business risks mentioned in the document
+- Margin pressures or declining trends
+- Competitive/regulatory concerns cited
+- External geopolitical risks (if provided)
+
+The `description` must reference specific risks found in the context.
+
+## 4. RISK FACTORS (2-4 items)
+
+Extract SPECIFIC risks mentioned in:
+A) The financial documents (look for risk sections, MD&A, footnotes)
+B) External geopolitical data (if the "EXTERNAL GEOPOLITICAL RISK DATA" section exists)
+
+**STRICT RULES:**
+- Only include risks explicitly mentioned in the context or external data
+- DO NOT add generic risks like "Supply Chain Concentration" unless specifically discussed
+- External geopolitical risks from APIs are REAL DATA - include them when present
+- Use severity from external sources as-is
+
+Icon guide:
+- "globe" - geopolitical, regulatory, international risks
+- "chain" - supply chain, operational risks  
+- "dollar" - financial, liquidity, currency risks
+- "alert" - general business risks
+- "chart" - market volatility, competitive risks
+
+## 5. SUGGESTED QUESTIONS (3 questions)
+
+Generate follow-up questions based on:
+- Topics mentioned but not fully explored
+- Specific business segments or products referenced
+- Financial metrics that could be analyzed further
+- Geopolitical risks that might impact the business
+
+Make questions SPECIFIC to this document - use actual company names, product lines, or metrics mentioned.
+
+**BAD (too generic):** "What are the company's growth strategies?"
+**GOOD:** "How is the Data Center segment performing relative to Graphics?"
 
 {format_instructions}
 
-FINAL REMINDER: 
-- Extracts actual numbers for metric_value in key_highlights.
-- Document-based data must be traceable to the financial report context
-- External geopolitical risks from APIs are REAL-TIME DATA from NewsAPI, World Bank, and GDELT - include them when available
-- Do not fabricate risks that aren't in either source
-- If context lacks specific information for document-based risks, acknowledge it rather than inventing placeholder data
+**FINAL CHECKLIST BEFORE RESPONDING:**
+☐ Every metric_value contains an ACTUAL number from the context (not "N/A" or placeholder)
+☐ Sentiment score is justified by specific evidence from context
+☐ Risk factors are either from the document OR external data sources (not invented)
+☐ Suggested questions reference specific topics from THIS document
+☐ If certain data isn't available, I've adapted to extract what IS available rather than using placeholders
+
+Now analyze the context and generate the intelligence report.
 """)
 
     chain = prompt | llm | parser
@@ -365,29 +384,40 @@ FINAL REMINDER:
         
         intelligence_data = result.model_dump()
         
-        # Log the sources used
+        # Log what was extracted
+        logger.info("✓ Intelligence Hub data generated successfully")
+        logger.info(f"  - Key highlights: {len(intelligence_data.get('key_highlights', []))}")
+        logger.info(f"  - Sentiment score: {intelligence_data.get('sentiment', {}).get('score', 'N/A')}")
+        logger.info(f"  - Risk level: {intelligence_data.get('risk', {}).get('level', 'N/A')}")
+        logger.info(f"  - Risk factors: {len(intelligence_data.get('risk_factors', []))}")
+        
+        # Debug: Log actual extracted highlights
+        for i, highlight in enumerate(intelligence_data.get('key_highlights', []), 1):
+            logger.info(f"  Highlight {i}: {highlight.get('text', '')[:80]}... (metric: {highlight.get('metric_value', 'None')})")
+        
         if geopolitical_context:
-            logger.info(f"Intelligence Hub generated with external geopolitical data")
-            logger.info(f"Risk factors identified: {len(intelligence_data.get('risk_factors', []))}")
+            logger.info("  ✓ Integrated external geopolitical data")
         
         return {"intelligence_hub_data": intelligence_data}
         
     except Exception as e:
-        logger.error(f"Error generating intelligence hub data: {e}")
-        # Return a minimal structure on error with clear indication of failure
+        logger.error(f"Error generating intelligence hub data: {e}", exc_info=True)
+        logger.error(f"Context that caused error (first 1000 chars): {full_context[:1000]}")
+        
+        # Return a minimal error structure
         return {
             "intelligence_hub_data": {
                 "key_highlights": [
                     {
                         "icon": "alert",
-                        "text": "Unable to extract highlights from the provided context",
+                        "text": f"Error extracting highlights: {str(e)[:100]}",
                         "metric_value": None
                     }
                 ],
                 "sentiment": {
                     "score": 50, 
-                    "change": "N/A", 
-                    "description": "Insufficient data to analyze sentiment"
+                    "change": None, 
+                    "description": "Unable to analyze sentiment - see error details"
                 },
                 "risk": {
                     "level": "Moderate", 
@@ -401,7 +431,9 @@ FINAL REMINDER:
                     }
                 ],
                 "suggested_questions": [
-                    "Please provide more specific financial documents for analysis"
+                    "Please check the PDF extraction quality",
+                    "Try uploading the document again",
+                    "Contact support if the issue persists"
                 ]
             }
         }
