@@ -209,6 +209,15 @@ async def get_document_analysis(
         analysis_data = object_store.get_json(analysis_key)
         if not analysis_data:
             return {"status": "processing", "message": "Analysis not yet available"}
+        
+        # Transform old format to new format for backward compatibility
+        if 'intelligence_hub_data' in analysis_data and 'intelligence_hub' not in analysis_data:
+            analysis_data = {
+                "answer": analysis_data.get("answer"),
+                "verification_status": "PASS" if analysis_data.get("is_valid") else "FAIL",
+                "intelligence_hub": analysis_data.get("intelligence_hub_data", {}),
+                "metadata": {"document_id": document_id}
+            }
             
         return analysis_data
     except Exception as e:
