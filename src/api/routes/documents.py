@@ -11,6 +11,10 @@ from src.api.dependencies import get_vector_store, get_object_store, get_analysi
 from src.infrastructure.storage.vector.base import VectorStore
 from src.infrastructure.storage.object.base import ObjectStore
 from src.core.services.analysis_service import AnalysisService
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+import uuid
 
 # We need a Pydantic schema for Document List response if not already defined
 # src/domain/schemas/document.py has DocumentResponse
@@ -61,10 +65,9 @@ async def upload_document(
         # But to keep it simple and actionable, I'll allow inline import or helper method here.
         # Legacy dependencies: langchain_community.document_loaders, langchain_text_splitters
         
-        from langchain_community.document_loaders import PyPDFLoader
-        from langchain_text_splitters import RecursiveCharacterTextSplitter
-        from langchain_openai import OpenAIEmbeddings
-        import uuid
+        
+        # loader = PyPDFLoader(file_path) # these are now imported at top
+
         
         loader = PyPDFLoader(file_path)
         pages = loader.load()

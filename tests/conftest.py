@@ -1,9 +1,27 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+import sys
+from unittest.mock import MagicMock, AsyncMock, patch
+from dataclasses import dataclass
+
+# Mock Turso database BEFORE importing anything that uses it
+@dataclass
+class MockUser:
+    id: str
+    email: str
+    password: str
+    created_at: str
+
+mock_turso_client = MagicMock()
+mock_turso_db = MagicMock()
+
+# Patch libsql_client before it gets imported by models.py
+sys.modules['libsql_client'] = MagicMock()
+
+# Now we can safely import
 from src.infrastructure.storage.vector.base import VectorStore
 from src.infrastructure.storage.object.base import ObjectStore
 from src.core.workflows.state import AnalysisState
-from src.domain.entities.user import User
+from src.models import User
 
 @pytest.fixture
 def mock_vector_store():
