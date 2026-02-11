@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
-from models import User, turso_db
+from src.models import User, turso_db
 
 load_dotenv()
 
