@@ -44,8 +44,9 @@ class Researcher(BaseAgent[AnalysisState]):
         chunks = []
         if hasattr(results, 'matches'):
             for match in results.matches:
-                if 'metadata' in match and 'text' in match.metadata:
-                    chunks.append(match.metadata['text'])
+                if hasattr(match, 'metadata') and hasattr(match.metadata, '__getitem__'):
+                    if 'text' in match.metadata:
+                        chunks.append(match.metadata['text'])
         
         state["context"] = "\n\n".join(chunks)
         state["contexts"] = chunks
