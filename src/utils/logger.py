@@ -7,11 +7,16 @@ from functools import lru_cache
 
 @lru_cache()
 def setup_logging(
-    default_path='config/logging.yaml',
+    default_path=None,
     default_level=logging.INFO,
     env_key='LOG_CFG'
 ):
     """Setup logging configuration"""
+    if default_path is None:
+        # Default to src/config/logging.yaml relative to this file
+        # src/utils/logger.py -> src/utils/../config/logging.yaml -> src/config/logging.yaml
+        default_path = Path(__file__).resolve().parent.parent / 'config' / 'logging.yaml'
+
     path = default_path
     value = os.getenv(env_key, None)
     if value:
