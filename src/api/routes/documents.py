@@ -1,8 +1,9 @@
 import os
 import shutil
 import time
+import json
 from typing import List
-from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends
+from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 
 from src.models import User
@@ -26,12 +27,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload", response_model=DocumentIngestResponse)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     ticker: str = Form(...),
     current_user: User = Depends(get_current_user),
     vector_store: VectorStore = Depends(get_vector_store),
     object_store: ObjectStore = Depends(get_object_store),
-
+    analysis_service: AnalysisService = Depends(get_analysis_service)
 ):
     user_id = current_user.id
     
@@ -95,6 +97,15 @@ async def upload_document(
         if os.path.exists(file_path):
             os.remove(file_path)
             
+        # Schedule background analysis
+        background_tasks.add_task(
+            background_analysis_task,
+            document_id,
+            user_id,
+            analysis_service,
+            object_store
+        )
+
         return DocumentIngestResponse(
             document_id=document_id,
             num_chunks=len(chunks),
@@ -156,9 +167,53 @@ async def list_documents(
         
         return documents
     except Exception as e:
-
         print(f"Error listing documents: {e}")
         return []
+
+async def background_analysis_task(
+    document_id: str,
+    user_id: str,
+    analysis_service: AnalysisService,
+    object_store: ObjectStore
+):
+    try:
+        print(f"Starting background analysis for doc {document_id}")
+        # Default question for auto-analysis
+        question = "Provide a comprehensive financial analysis of this document, including key highlights, risks, and strategic outlook."
+        
+        result = await analysis_service.analyze_document(
+            question=question,
+            document_id=document_id,
+            user_id=user_id
+        )
+        
+        # Save result to S3
+        analysis_key = f"{user_id}/{document_id}/analysis.json"
+        object_store.save_json(result, analysis_key)
+        print(f"Background analysis completed and saved to {analysis_key}")
+        
+    except Exception as e:
+        print(f"Background analysis failed for doc {document_id}: {e}")
+
+@router.get("/{document_id}/analysis")
+async def get_document_analysis(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    object_store: ObjectStore = Depends(get_object_store)
+):
+    """Retrieve the analysis result for a document"""
+    user_id = current_user.id
+    analysis_key = f"{user_id}/{document_id}/analysis.json"
+    
+    try:
+        analysis_data = object_store.get_json(analysis_key)
+        if not analysis_data:
+            return {"status": "processing", "message": "Analysis not yet available"}
+            
+        return analysis_data
+    except Exception as e:
+        print(f"Error fetching analysis: {e}")
+        return {"status": "processing", "message": "Analysis not yet available"}
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(

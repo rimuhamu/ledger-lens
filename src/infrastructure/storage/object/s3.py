@@ -59,3 +59,29 @@ class S3ObjectStore(ObjectStore):
             self.logger.info(f"Deleted from S3: {key}")
         except ClientError as e:
             self.logger.error(f"Failed to delete from S3: {e}")
+
+    def save_json(self, data: dict, key: str) -> str:
+        import json
+        try:
+            json_str = json.dumps(data)
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=json_str,
+                ContentType='application/json'
+            )
+            self.logger.info(f"Saved JSON to S3: {key}")
+            return key
+        except ClientError as e:
+            self.logger.error(f"Failed to save JSON to S3: {e}")
+            raise
+
+    def get_json(self, key: str) -> dict:
+        import json
+        try:
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            content = response['Body'].read().decode('utf-8')
+            return json.loads(content)
+        except ClientError as e:
+            self.logger.error(f"Failed to get JSON from S3: {e}")
+            return {}

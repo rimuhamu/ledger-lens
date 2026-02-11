@@ -16,3 +16,13 @@ class ObjectStore(ABC):
     def delete_file(self, key: str) -> None:
         """Delete a file by key"""
         pass
+
+    @abstractmethod
+    def save_json(self, data: dict, key: str) -> str:
+        """Save a dictionary as a JSON file"""
+        pass
+
+    @abstractmethod
+    def get_json(self, key: str) -> dict:
+        """Retrieve a JSON file as a dictionary"""
+        pass
