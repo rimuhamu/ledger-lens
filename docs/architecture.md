@@ -18,7 +18,7 @@ The application is structured into four main layers:
 
 ```mermaid
 graph TD
-    Client[Client (Web/Mobile)] --> API[API Layer]
+    Client["Client (Web/Mobile)"] --> API[API Layer]
     
     subgraph "API Layer"
         Auth[Auth Routes]
