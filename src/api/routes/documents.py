@@ -226,13 +226,19 @@ async def get_document_analysis(
                 "answer": analysis_data.get("answer"),
                 "verification_status": "PASS" if analysis_data.get("is_valid") else "FAIL",
                 "intelligence_hub": analysis_data.get("intelligence_hub_data", {}),
-                "metadata": {"document_id": document_id}
+                "metadata": {"document_id": document_id},
+                "confidence_metrics": analysis_data.get("confidence_metrics", {}),
+                "retrieval_scores": analysis_data.get("retrieval_scores", []),
+                "retrieved_sources": analysis_data.get("retrieved_sources", []),
+                "generation_logprobs": analysis_data.get("generation_logprobs", [])
             }
             
         return analysis_data
     except Exception as e:
         print(f"Error fetching analysis: {e}")
         return {"status": "processing", "message": "Analysis not yet available"}
+
+
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
