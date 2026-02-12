@@ -21,6 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+print(f"DEBUG: CORS_ORIGINS set to: {settings.CORS_ORIGINS}")
+
 # Include routers
 app.include_router(auth.router)
 app.include_router(documents.router)

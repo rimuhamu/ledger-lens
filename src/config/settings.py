@@ -23,10 +23,18 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> Union[list[str], str]:
         if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+            origins = [i.strip() for i in v.split(",")]
+        elif isinstance(v, list):
+            origins = v
+        elif isinstance(v, str) and v.startswith("["):
+            # Handle JSON list string if pydantic-settings didn't
+            import json
+            origins = json.loads(v)
+        else:
             return v
-        raise ValueError(v)
+        
+        # Standardize origins: no trailing slashes
+        return [o.rstrip("/") for o in origins]
     
     # OpenAI
     OPENAI_API_KEY: str
