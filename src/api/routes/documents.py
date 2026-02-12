@@ -13,7 +13,7 @@ from src.api.dependencies import get_vector_store, get_object_store, get_analysi
 from src.infrastructure.storage.vector.base import VectorStore
 from src.infrastructure.storage.object.base import ObjectStore
 from src.core.services.analysis_service import AnalysisService
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 import uuid
@@ -55,7 +55,7 @@ async def upload_document(
         # Parse PDF and split into chunks
 
         
-        loader = PyPDFLoader(file_path)
+        loader = PyMuPDFLoader(file_path)
         pages = loader.load()
         
         text_splitter = RecursiveCharacterTextSplitter(

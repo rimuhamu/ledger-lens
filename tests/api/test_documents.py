@@ -24,7 +24,7 @@ def test_upload_document_success(mock_embeddings, client, mock_vector_store, moc
     # Create a fake PDF file
     pdf_content = b"%PDF-1.4\n%fake pdf content"
     
-    with patch('src.api.routes.documents.PyPDFLoader') as mock_loader:
+    with patch('src.api.routes.documents.PyMuPDFLoader') as mock_loader:
         mock_loader_instance = MagicMock()
         mock_loader_instance.load.return_value = [
             MagicMock(page_content="Test content", metadata={"page": 0})
