@@ -4,11 +4,11 @@ FROM python:3.11-slim
 # Set the working directory to /app
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
-COPY requirements.txt .
+# Copy the pyproject.toml file into the container at /app
+COPY pyproject.toml .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the package and its dependencies
+RUN pip install --no-cache-dir .
 
 # Copy the current directory contents into the container at /app
 COPY . .
