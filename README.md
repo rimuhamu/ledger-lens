@@ -25,12 +25,17 @@
     ```
 
 2.  **Set up environment**:
-    Copy `.env.example` to `.env` and fill in your API keys:
-    - `OPENAI_API_KEY`: For LLM and embeddings.
-    - `PINECONE_API_KEY`: For vector storage.
-    - `TURSO_DATABASE_URL` & `TURSO_AUTH_TOKEN`: For user data persistence.
-    - `NEWS_API_KEY`: For geopolitical risk analysis.
-    - `AWS_ACCESS_KEY_ID`: For S3 object storage (or MinIO if running locally).
+    Copy `.env.example` to `.env` and fill in your configuration:
+    ```bash
+    cp .env.example .env
+    ```
+    Key variables include:
+    - `OPENAI_API_KEY`: Required for LLM and embeddings.
+    - `PINECONE_API_KEY`: Required if using Pinecone for vector storage.
+    - `AWS_ACCESS_KEY_ID` & `AWS_SECRET_ACCESS_KEY`: Required for S3 object storage.
+    - `TURSO_DATABASE_URL` & `TURSO_AUTH_TOKEN`: Required for database persistence.
+    - `JWT_SECRET_KEY`: Required for authentication (generate with `openssl rand -hex 32`).
+    - `NEWS_API_KEY`: Optional, required for geopolitical analysis feature.
 
 3.  **Install dependencies**:
     ```bash
