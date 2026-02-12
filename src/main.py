@@ -1,6 +1,6 @@
 import os
 from fastapi import FastAPI
-from src.api.routes import auth, documents, analysis
+from src.api.routes import auth, documents, analysis, dashboard
 
 app = FastAPI(
     title="LedgerLens API",
@@ -22,6 +22,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(analysis.router)
+app.include_router(dashboard.router)
 
 @app.get("/")
 def read_root():
