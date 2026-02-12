@@ -30,6 +30,13 @@ class IntelligenceHub(BaseAgent[AnalysisState]):
         
         Generate a comprehensive intelligence report (Key Highlights, Sentiment, Risk, FAQs).
         Strictly follow the format instructions.
+
+        Analysis Guidelines:
+        1. Sentiment Score:
+           - 0-39: Bearish (Negative outlook, risks outweigh opportunities)
+           - 40-60: Neutral (Balanced view)
+           - 61-100: Bullish (Positive outlook, growth potential)
+        2. Be objective and data-driven.
         
         {format_instructions}
         """)

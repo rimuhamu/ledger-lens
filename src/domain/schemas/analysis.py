@@ -31,7 +31,7 @@ class RiskFactor(BaseModel):
 
 class SentimentData(BaseModel):
     """Sentiment score with trend information"""
-    score: int = Field(..., ge=0, le=100, description="Sentiment score from 0-100")
+    score: int = Field(..., ge=0, le=100, description="Sentiment score from 0 (Extremely Bearish) to 100 (Extremely Bullish)")
     change: Optional[str] = Field(None, description="Score change indicator (e.g., '+12%', '-5%', or None if not available)")
     description: str = Field(..., description="Brief explanation of the sentiment")
 
