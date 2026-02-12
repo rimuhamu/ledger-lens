@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     API_VERSION: str = "2.0.0"
     DEBUG: bool = False
     
+    # CORS
+    CORS_ORIGINS: list[str] = ["*"]
+    
     # OpenAI
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o-mini"
