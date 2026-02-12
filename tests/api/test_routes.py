@@ -10,49 +10,49 @@ from src.models import User
 from src.auth import get_current_user
 from fastapi import HTTPException
 
-client = TestClient(app)
+@pytest.fixture
+def mock_vector_store():
+    return MagicMock(spec=VectorStore)
 
-# Mocks for overrides
-mock_vector_store_instance = MagicMock(spec=VectorStore)
-mock_object_store_instance = MagicMock(spec=ObjectStore)
-mock_analysis_service_instance = MagicMock(spec=AnalysisService)
+@pytest.fixture
+def mock_object_store():
+    return MagicMock(spec=ObjectStore)
 
-def override_get_vector_store():
-    return mock_vector_store_instance
+@pytest.fixture
+def mock_analysis_service():
+    return MagicMock(spec=AnalysisService)
 
-def override_get_object_store():
-    return mock_object_store_instance
+@pytest.fixture
+def mock_user():
+    return User(
+        id="user123",
+        email="test@example.com",
+        password="hashed",
+        created_at="2023-01-01T00:00:00"
+    )
 
-def override_get_analysis_service():
-    return mock_analysis_service_instance
-
-app.dependency_overrides[get_vector_store] = override_get_vector_store
-app.dependency_overrides[get_object_store] = override_get_object_store
-app.dependency_overrides[get_analysis_service] = override_get_analysis_service
-
-# Auth override
-mock_user_instance = User(
-    id="user123",
-    email="test@example.com",
-    password="hashed",
-    created_at="2023-01-01T00:00:00"
-)
-
-def override_get_current_user():
-    return mock_user_instance
-
-app.dependency_overrides[get_current_user] = override_get_current_user
+@pytest.fixture
+def client(mock_vector_store, mock_object_store, mock_analysis_service, mock_user):
+    app.dependency_overrides[get_vector_store] = lambda: mock_vector_store
+    app.dependency_overrides[get_object_store] = lambda: mock_object_store
+    app.dependency_overrides[get_analysis_service] = lambda: mock_analysis_service
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    
+    with TestClient(app) as c:
+        yield c
+        
+    app.dependency_overrides.clear()
 
 # ============================================================================
 # BASIC ENDPOINTS
 # ============================================================================
 
-def test_health_check():
+def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
 
-def test_root():
+def test_root(client):
     response = client.get("/")
     assert response.status_code == 200
     assert "LedgerLens Analyst" in response.json()["status"]
@@ -64,7 +64,7 @@ def test_root():
 @patch('src.api.routes.auth.turso_db')
 @patch('src.api.routes.auth.hash_password')
 @patch('src.api.routes.auth.create_access_token')
-def test_register_success(mock_create_token, mock_hash_password, mock_turso_db):
+def test_register_success(mock_create_token, mock_hash_password, mock_turso_db, client):
     """Test successful user registration"""
     # Setup mocks
     mock_hash_password.return_value = "hashed_password"
@@ -88,7 +88,7 @@ def test_register_success(mock_create_token, mock_hash_password, mock_turso_db):
     assert data["user"]["email"] == "test@example.com"
 
 @patch('src.api.routes.auth.turso_db')
-def test_register_duplicate_email(mock_turso_db):
+def test_register_duplicate_email(mock_turso_db, client):
     """Test registration with existing email"""
     mock_turso_db.get_user_by_email.return_value = User(
         id="existing_user",
@@ -106,7 +106,7 @@ def test_register_duplicate_email(mock_turso_db):
     assert "already registered" in response.json()["detail"]
 
 @patch('src.api.routes.auth.turso_db')
-def test_register_missing_email(mock_turso_db):
+def test_register_missing_email(mock_turso_db, client):
     """Test registration with missing email"""
     response = client.post("/auth/register", json={
         "email": "",
@@ -117,7 +117,7 @@ def test_register_missing_email(mock_turso_db):
     assert "required" in response.json()["detail"]
 
 @patch('src.api.routes.auth.turso_db')
-def test_register_short_password(mock_turso_db):
+def test_register_short_password(mock_turso_db, client):
     """Test registration with password too short"""
     mock_turso_db.get_user_by_email.return_value = None
     
@@ -132,7 +132,7 @@ def test_register_short_password(mock_turso_db):
 @patch('src.api.routes.auth.turso_db')
 @patch('src.api.routes.auth.verify_password')
 @patch('src.api.routes.auth.create_access_token')
-def test_login_success(mock_create_token, mock_verify_password, mock_turso_db):
+def test_login_success(mock_create_token, mock_verify_password, mock_turso_db, client):
     """Test successful login"""
     mock_verify_password.return_value = True
     mock_create_token.return_value = "test_token"
@@ -155,7 +155,7 @@ def test_login_success(mock_create_token, mock_verify_password, mock_turso_db):
 
 @patch('src.api.routes.auth.turso_db')
 @patch('src.api.routes.auth.verify_password')
-def test_login_invalid_password(mock_verify_password, mock_turso_db):
+def test_login_invalid_password(mock_verify_password, mock_turso_db, client):
     """Test login with invalid password"""
     mock_verify_password.return_value = False
     mock_turso_db.get_user_by_email.return_value = User(
@@ -174,7 +174,7 @@ def test_login_invalid_password(mock_verify_password, mock_turso_db):
     assert "Invalid" in response.json()["detail"]
 
 @patch('src.api.routes.auth.turso_db')
-def test_login_nonexistent_user(mock_turso_db):
+def test_login_nonexistent_user(mock_turso_db, client):
     """Test login with non-existent user"""
     mock_turso_db.get_user_by_email.return_value = None
     
@@ -187,7 +187,7 @@ def test_login_nonexistent_user(mock_turso_db):
     assert "Invalid" in response.json()["detail"]
 
 @pytest.mark.asyncio
-async def test_get_me_success():
+async def test_get_me_success(client):
     """Test getting current user profile"""
     # Uses default override returning mock_user_instance
     
@@ -198,7 +198,7 @@ async def test_get_me_success():
     assert data["email"] == "test@example.com"
     assert data["id"] == "user123"
 
-def test_get_me_unauthorized():
+def test_get_me_unauthorized(client):
     """Test getting profile without authentication"""
     def raise_unauthorized():
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -207,7 +207,14 @@ def test_get_me_unauthorized():
     try:
         response = client.get("/auth/me")
     finally:
-        app.dependency_overrides[get_current_user] = override_get_current_user
+        # Restore mock user
+        # In fixture setup we used a specific lambda, we can't easily restore 'override_get_current_user' 
+        # because we don't have it. 
+        # But `client` fixture uses app.dependency_overrides.clear() at the end.
+        # So we can just clear it here if we want or re-set it.
+        # But this test modifies the override.
+        # Let's just re-set it to valid user for consistency if needed, but teardown handles it.
+        pass
     
     # Assert on the response captured inside the try block
     assert response.status_code == 401
@@ -217,7 +224,7 @@ def test_get_me_unauthorized():
 # ============================================================================
 
 @patch('src.api.routes.documents.OpenAIEmbeddings')
-def test_upload_document_success(mock_embeddings):
+def test_upload_document_success(mock_embeddings, client, mock_vector_store, mock_object_store):
     """Test successful document upload"""
     # Auth handled by dependency override
     
@@ -227,10 +234,10 @@ def test_upload_document_success(mock_embeddings):
     mock_embeddings.return_value = mock_embed_instance
     
     # Mock vector store
-    mock_vector_store_instance.upsert.return_value = None
+    mock_vector_store.upsert.return_value = None
     
     # Mock object store
-    mock_object_store_instance.upload_file.return_value = None
+    mock_object_store.upload_file.return_value = None
     
     # Create a fake PDF file
     from io import BytesIO
@@ -254,7 +261,7 @@ def test_upload_document_success(mock_embeddings):
     assert data["status"] == "success"
     assert "document_id" in data
 
-def test_upload_document_non_pdf():
+def test_upload_document_non_pdf(client):
     """Test upload with non-PDF file"""
     # Auth handled by dependency override
     
@@ -269,23 +276,20 @@ def test_upload_document_non_pdf():
     assert response.status_code == 400
     assert "PDF" in response.json()["detail"]
 
-def test_list_documents_success():
+@patch('src.api.routes.documents.turso_db')
+def test_list_documents_success(mock_turso_db, client):
     """Test listing user's documents"""
     # Auth handled by dependency override
     
-    # Mock vector store query response
-    mock_match = MagicMock()
-    mock_match.metadata = {
-        "document_id": "doc123",
-        "ticker": "AAPL",
-        "filename": "test.pdf",
-        "created_at": "2023-01-01T00:00:00",
-        "s3_key": "user123/test.pdf"
-    }
+    # Mock TursoDB response
+    mock_doc = MagicMock()
+    mock_doc.id = "doc123"
+    mock_doc.ticker = "AAPL"
+    mock_doc.filename = "test.pdf"
+    mock_doc.created_at = "2023-01-01T00:00:00"
+    mock_doc.s3_key = "user123/test.pdf"
     
-    mock_results = MagicMock()
-    mock_results.matches = [mock_match]
-    mock_vector_store_instance.query.return_value = mock_results
+    mock_turso_db.list_user_documents.return_value = [mock_doc]
     
     response = client.get("/documents/")
     
@@ -294,20 +298,19 @@ def test_list_documents_success():
     assert len(data) == 1
     assert data[0]["document_id"] == "doc123"
 
-def test_list_documents_empty():
+@patch('src.api.routes.documents.turso_db')
+def test_list_documents_empty(mock_turso_db, client):
     """Test listing documents for user with no documents"""
     # Auth handled by dependency override
     
-    mock_results = MagicMock()
-    mock_results.matches = []
-    mock_vector_store_instance.query.return_value = mock_results
+    mock_turso_db.list_user_documents.return_value = []
     
     response = client.get("/documents/")
     
     assert response.status_code == 200
     assert response.json() == []
 
-def test_get_document_success():
+def test_get_document_success(client, mock_vector_store):
     """Test getting specific document"""
     # Auth handled by dependency override
     
@@ -322,7 +325,7 @@ def test_get_document_success():
     
     mock_results = MagicMock()
     mock_results.matches = [mock_match]
-    mock_vector_store_instance.query.return_value = mock_results
+    mock_vector_store.query.return_value = mock_results
     
     response = client.get("/documents/doc123")
     
@@ -330,13 +333,13 @@ def test_get_document_success():
     data = response.json()
     assert data["document_id"] == "doc123"
 
-def test_get_document_not_found():
+def test_get_document_not_found(client, mock_vector_store):
     """Test getting non-existent document"""
     # Auth handled by dependency override
     
     mock_results = MagicMock()
     mock_results.matches = []
-    mock_vector_store_instance.query.return_value = mock_results
+    mock_vector_store.query.return_value = mock_results
     
     response = client.get("/documents/nonexistent")
     
@@ -347,12 +350,12 @@ def test_get_document_not_found():
 # ANALYSIS ROUTES
 # ============================================================================
 
-def test_analyze_document_success():
+def test_analyze_document_success(client, mock_analysis_service):
     """Test successful document analysis"""
     # Auth handled by dependency override
     
     # Mock analysis service
-    mock_analysis_service_instance.analyze_document = AsyncMock(return_value={
+    mock_analysis_service.analyze_document = AsyncMock(return_value={
         "answer": "Test analysis result",
         "is_valid": True,
         "intelligence_hub_data": {"key": "value"}
@@ -368,11 +371,11 @@ def test_analyze_document_success():
     assert data["answer"] == "Test analysis result"
     assert data["verification_status"] == "PASS"
 
-def test_analyze_document_validation_fail():
+def test_analyze_document_validation_fail(client, mock_analysis_service):
     """Test analysis with validation failure"""
     # Auth handled by dependency override
     
-    mock_analysis_service_instance.analyze_document = AsyncMock(return_value={
+    mock_analysis_service.analyze_document = AsyncMock(return_value={
         "answer": "Invalid result",
         "is_valid": False,
         "intelligence_hub_data": {}
@@ -387,11 +390,11 @@ def test_analyze_document_validation_fail():
     data = response.json()
     assert data["verification_status"] == "FAIL"
 
-def test_analyze_document_error():
+def test_analyze_document_error(client, mock_analysis_service):
     """Test analysis with service error"""
     # Auth handled by dependency override
     
-    mock_analysis_service_instance.analyze_document = AsyncMock(
+    mock_analysis_service.analyze_document = AsyncMock(
         side_effect=Exception("Analysis failed")
     )
     
