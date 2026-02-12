@@ -141,6 +141,23 @@ class TursoDB:
             created_at=now, analysis_status="pending"
         )
 
+    def get_document(self, document_id: str) -> Optional[Document]:
+        """Fetch a document by ID."""
+        rs = self._client.execute(
+            "SELECT id, user_id, filename, ticker, s3_key, created_at, analysis_status, "
+            "sentiment_score, sentiment_label, ai_score, risk_level, summary "
+            "FROM documents WHERE id = ?",
+            [document_id]
+        )
+        if rs.rows:
+            row = rs.rows[0]
+            return Document(
+                id=row[0], user_id=row[1], filename=row[2], ticker=row[3], s3_key=row[4], created_at=row[5],
+                analysis_status=row[6], sentiment_score=row[7], sentiment_label=row[8], ai_score=row[9],
+                risk_level=row[10], summary=row[11]
+            )
+        return None
+
     def update_document_analysis(self, document_id: str, sentiment_score: float, sentiment_label: str, 
                                  ai_score: float, risk_level: str, summary: str):
         """Update document with analysis results."""
@@ -154,6 +171,13 @@ class TursoDB:
             "summary = ? "
             "WHERE id = ?",
             [sentiment_score, sentiment_label, ai_score, risk_level, summary, document_id]
+        )
+
+    def delete_document(self, document_id: str):
+        """Delete a document record."""
+        self._client.execute(
+            "DELETE FROM documents WHERE id = ?",
+            [document_id]
         )
 
     def list_user_documents(self, user_id: str, limit: int = 50) -> List[Document]:

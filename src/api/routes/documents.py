@@ -268,3 +268,46 @@ async def get_document(
         print(f"Error fetching document: {e}")
         
     raise HTTPException(status_code=404, detail="Document not found or access denied")
+
+@router.delete("/{document_id}")
+async def delete_document(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    object_store: ObjectStore = Depends(get_object_store),
+    vector_store: VectorStore = Depends(get_vector_store)
+):
+    """
+    Delete a document and all its associated data (S3 files, vector embeddings, DB record).
+    """
+    user_id = current_user.id
+    
+    # Verify document exists and belongs to user
+    doc = turso_db.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if doc.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this document")
+
+    try:
+        # Delete from Pinecone
+        vector_store.delete(filter={"document_id": document_id, "user_id": user_id})
+        
+        # Delete from S3
+        # Delete the PDF file
+        if doc.s3_key:
+            object_store.delete_file(doc.s3_key)
+        
+        # Delete the analysis JSON
+        analysis_key = f"{user_id}/{document_id}/analysis.json"
+        object_store.delete_file(analysis_key)
+        
+        # Delete from TursoDB
+        turso_db.delete_document(document_id)
+        
+        return {"status": "success", "message": "Document deleted successfully"}
+
+    except Exception as e:
+        print(f"Error during deletion: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
