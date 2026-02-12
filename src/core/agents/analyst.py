@@ -33,8 +33,24 @@ class Analyst(BaseAgent[AnalysisState]):
             Answer:
         """)
 
-        chain = prompt | self.llm
+        # Bind logprobs to the LLM
+        # LangChain ChatOpenAI supports logprobs=True
+        llm_with_logprobs = self.llm.bind(logprobs=True)
+        chain = prompt | llm_with_logprobs
+        
         response = await chain.ainvoke({"context": full_context, "question": question})
         
+        # Extract logprobs from response metadata
+        # Structure depends on the provider, for OpenAI it's usually in response.response_metadata['logprobs']['content']
+        logprobs_data = []
+        if hasattr(response, 'response_metadata'):
+            meta = response.response_metadata
+            if 'logprobs' in meta and 'content' in meta['logprobs']:
+                # content is a list of dicts, each having 'logprob'
+                for item in meta['logprobs']['content']:
+                    if 'logprob' in item:
+                        logprobs_data.append(item['logprob'])
+        
         state["answer"] = response.content
+        state["generation_logprobs"] = logprobs_data
         return state

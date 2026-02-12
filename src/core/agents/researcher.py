@@ -32,16 +32,29 @@ class Researcher(BaseAgent[AnalysisState]):
             filter={"document_id": document_id} if document_id else None
         )
         
-        # Extract text content from query results
+        # Extract text content and metadata from query results
         chunks = []
+        scores = []
+        sources = []
+        
         if hasattr(results, 'matches'):
             for match in results.matches:
                 if hasattr(match, 'metadata') and hasattr(match.metadata, '__getitem__'):
                     if 'text' in match.metadata:
                         chunks.append(match.metadata['text'])
+                        
+                    # Extract score (similarity)
+                    if hasattr(match, 'score'):
+                        scores.append(match.score)
+                    
+                    # Extract source filename
+                    if 'filename' in match.metadata:
+                        sources.append(match.metadata['filename'])
         
         state["context"] = "\n\n".join(chunks)
         state["contexts"] = chunks
+        state["retrieval_scores"] = scores
+        state["retrieved_sources"] = sources
         state["geopolitical_context"] = geopolitical_context
         
         return state

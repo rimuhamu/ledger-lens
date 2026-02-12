@@ -62,6 +62,8 @@ async def analyze_document(
             "answer": result.get("answer"),
             "verification_status": "PASS" if result.get("is_valid") else "FAIL",
             "intelligence_hub": result.get("intelligence_hub_data", {}),
+            "confidence_metrics": result.get("confidence_metrics", {}),
+            "sources": list(set(result.get("retrieved_sources", []))),
             "metadata": {
                 "document_id": document_id
             }

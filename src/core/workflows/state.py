@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Optional, Any
+from typing import TypedDict, List, Optional, Any, Dict
 
 class AnalysisState(TypedDict):
     question: str
@@ -10,3 +10,7 @@ class AnalysisState(TypedDict):
     geopolitical_context: str
     document_id: Optional[str]
     user_id: Optional[str]
+    retrieval_scores: List[float]
+    retrieved_sources: List[str]
+    generation_logprobs: List[float]
+    confidence_metrics: Dict[str, Any]
