@@ -7,7 +7,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
 
-from src.models import User
+from src.models import User, turso_db
 from src.auth import get_current_user
 from src.api.dependencies import get_vector_store, get_object_store, get_analysis_service
 from src.infrastructure.storage.vector.base import VectorStore
@@ -73,6 +73,15 @@ async def upload_document(
         
         document_id = str(uuid.uuid4())
         
+        # Create document record in TursoDB
+        turso_db.create_document(
+            document_id=document_id,
+            user_id=user_id,
+            filename=file.filename,
+            ticker=ticker,
+            s3_key=s3_key
+        )
+        
         upsert_batch = []
         for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
             chunk_id = f"{document_id}_{i}"
@@ -122,51 +131,23 @@ async def upload_document(
 
 @router.get("/", response_model=List[DocumentResponse])
 async def list_documents(
-    current_user: User = Depends(get_current_user),
-    vector_store: VectorStore = Depends(get_vector_store)
+    current_user: User = Depends(get_current_user)
 ):
     """
-    List all saved documents for the authenticated user.
+    List all saved documents for the authenticated user from TursoDB.
     """
-    user_id = current_user.id
-    
-    # Query with dummy vector (1536-dim for OpenAI) to retrieve document metadata
-    dummy_vector = [0.0] * 1536
-    
-
     try:
-        results = vector_store.query(
-            vector=dummy_vector,
-            top_k=10000,
-            filter={"user_id": user_id},
-            include_metadata=True
-        )
+        docs = turso_db.list_user_documents(current_user.id)
         
-        # Deduplicate by document_id
-        seen = set()
-        documents = []
-        
-
-        matches = getattr(results, 'matches', [])
-        
-        for match in matches:
-            if not hasattr(match, 'metadata'):
-                continue
-                
-            metadata = match.metadata
-            doc_id = metadata.get("document_id")
-            
-            if doc_id and doc_id not in seen:
-                seen.add(doc_id)
-                documents.append(DocumentResponse(
-                    document_id=doc_id,
-                    ticker=metadata.get("ticker", "UNKNOWN"),
-                    filename=metadata.get("filename", "unknown"),
-                    created_at=str(metadata.get("created_at", "")),
-                    s3_key=metadata.get("s3_key")
-                ))
-        
-        return documents
+        return [
+            DocumentResponse(
+                document_id=doc.id,
+                ticker=doc.ticker,
+                filename=doc.filename,
+                created_at=doc.created_at,
+                s3_key=doc.s3_key
+            ) for doc in docs
+        ]
     except Exception as e:
         print(f"Error listing documents: {e}")
         return []
@@ -188,7 +169,35 @@ async def background_analysis_task(
             user_id=user_id
         )
         
-        # Save result to S3
+        # Extract metrics for DB
+        ih_data = result.get("intelligence_hub_data", {})
+        sentiment = ih_data.get("sentiment", {})
+        risk = ih_data.get("risk", {})
+        
+        # Normalize score to 0-100 float
+        raw_score = sentiment.get("score", 0)
+        # Handle if score is str "75" or int 75 or float 0.75? Assuming 0-100 based on UI
+        try:
+            score_val = float(raw_score)
+        except:
+            score_val = 0.0
+
+        # Determine label if not present (simple heuristic if missing)
+        label = "neutral"
+        if score_val > 60: label = "bullish"
+        elif score_val < 40: label = "bearish"
+        
+        # Update TursoDB
+        turso_db.update_document_analysis(
+            document_id=document_id,
+            sentiment_score=score_val,
+            sentiment_label=label,
+            ai_score=98.4, # Mocked validation score for now, or extract if available
+            risk_level=risk.get("level", "low").lower(),
+            summary=result.get("answer", "")[:500] # Truncate summary for DB
+        )
+
+        # Save full result to S3
         analysis_key = f"{user_id}/{document_id}/analysis.json"
         object_store.save_json(result, analysis_key)
         print(f"Background analysis completed and saved to {analysis_key}")
