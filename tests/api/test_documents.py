@@ -124,3 +124,26 @@ def test_get_document_not_found(client, mock_vector_store):
     
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
+
+def test_get_document_analysis_structure(client, mock_object_store):
+    """Test getting document analysis preserves new fields during transformation"""
+    mock_data = {
+        "answer": "Test answer",
+        "is_valid": True,
+        "intelligence_hub_data": {"sentiment": "positive"},
+        "confidence_metrics": {"score": 0.9},
+        "retrieval_scores": [0.8, 0.9],
+        "retrieved_sources": ["doc1", "doc2"],
+        "generation_logprobs": [-0.1, -0.2]
+    }
+    mock_object_store.get_json.return_value = mock_data
+    
+    response = client.get("/documents/doc123/analysis")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"] == "Test answer"
+    assert data["confidence_metrics"] == {"score": 0.9}
+    assert data["retrieval_scores"] == [0.8, 0.9]
+    assert data["retrieved_sources"] == ["doc1", "doc2"]
+    assert data["generation_logprobs"] == [-0.1, -0.2]
