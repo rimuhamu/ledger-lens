@@ -4,9 +4,10 @@
 
 ## 🚀 Features
 
-- **Multi-Agent Workflow**: Orchestrates specialized agents (Researcher, Analyst, Validator) for accurate analysis.
+- **Multi-Agent Workflow**: Orchestrates specialized agents (Researcher, Analyst, Validator, Intelligence Hub) for comprehensive analysis.
 - **RAG Powered**: Uses Pinecone vector search to ground answers in document data.
-- **Geopolitical Context**: Integrates external data to assess macro risks.
+- **Geopolitical Risk Analysis**: Integrates real-time geopolitical data (via NewsAPI) to assess macro risks relative to document entities.
+- **Intelligence Hub**: Generates executive summaries, extracted metrics, and risk assessments in a structured JSON format.
 - **Modular Architecture**: Built with a clean, layered design for scalability and maintainability.
 
 ## 📚 Documentation
@@ -24,7 +25,12 @@
     ```
 
 2.  **Set up environment**:
-    Copy `.env.example` to `.env` and fill in your API keys (OpenAI, Pinecone, AWS, Turso).
+    Copy `.env.example` to `.env` and fill in your API keys:
+    - `OPENAI_API_KEY`: For LLM and embeddings.
+    - `PINECONE_API_KEY`: For vector storage.
+    - `TURSO_DATABASE_URL` & `TURSO_AUTH_TOKEN`: For user data persistence.
+    - `NEWS_API_KEY`: For geopolitical risk analysis.
+    - `AWS_ACCESS_KEY_ID`: For S3 object storage (or MinIO if running locally).
 
 3.  **Install dependencies**:
     ```bash
