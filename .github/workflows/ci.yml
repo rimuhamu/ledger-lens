@@ -2,9 +2,9 @@ name: LedgerLens CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master", "refactor" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   test:
