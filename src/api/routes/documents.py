@@ -2,6 +2,7 @@ import os
 import shutil
 import time
 import json
+from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException, File, UploadFile, Form, Depends, BackgroundTasks
 from fastapi.responses import FileResponse
@@ -83,7 +84,7 @@ async def upload_document(
                 "ticker": ticker,
                 "user_id": user_id,
                 "filename": file.filename,
-                "timestamp": str(time.time())
+                "created_at": datetime.utcnow().isoformat() + "Z"
             }
             upsert_batch.append({
                 "id": chunk_id,
