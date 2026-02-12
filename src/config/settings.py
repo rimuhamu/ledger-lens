@@ -1,7 +1,8 @@
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Any, Union
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -16,7 +17,16 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # CORS
-    CORS_ORIGINS: list[str] = ["*"]
+    CORS_ORIGINS: Union[list[str], str] = ["*"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> Union[list[str], str]:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",")]
+        elif isinstance(v, (list, str)):
+            return v
+        raise ValueError(v)
     
     # OpenAI
     OPENAI_API_KEY: str
