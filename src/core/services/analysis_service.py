@@ -10,8 +10,9 @@ from src.infrastructure.storage.vector.base import VectorStore
 from src.utils.logger import get_logger
 
 class AnalysisService:
-    def __init__(self, vector_store: VectorStore):
+    def __init__(self, vector_store: VectorStore, object_store=None):
         self.logger = get_logger(self.__class__.__name__)
+        self.object_store = object_store
         
         # Initialize Agents
         self.researcher = Researcher(vector_store)
@@ -24,7 +25,8 @@ class AnalysisService:
             self.researcher,
             self.analyst,
             self.validator,
-            self.intelligence_hub
+            self.intelligence_hub,
+            self.object_store
         )
 
     def _calculate_confidence_metrics(self, state: AnalysisState) -> Dict[str, Any]:
@@ -112,7 +114,12 @@ class AnalysisService:
             retrieval_scores=[],
             retrieved_sources=[],
             generation_logprobs=[],
-            confidence_metrics={}
+            confidence_metrics={},
+            current_stage="pending",
+            stage_index=0,
+            total_stages=4,
+            status_message="Analysis queued",
+            status="pending"
         )
         
         final_state = await self.workflow.run(initial_state)
@@ -121,3 +128,20 @@ class AnalysisService:
         final_state["confidence_metrics"] = self._calculate_confidence_metrics(final_state)
         
         return final_state
+    
+    async def get_analysis_status(self, document_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve the current analysis status from S3.
+        Returns the progress state or None if not found.
+        """
+        if not self.object_store:
+            return None
+            
+        try:
+            # Try to get the status file
+            status_key = f"{user_id}/{document_id}/status.json"
+            status_data = self.object_store.get_json(status_key)
+            return status_data
+        except Exception as e:
+            self.logger.debug(f"No status found for {document_id}: {e}")
+            return None

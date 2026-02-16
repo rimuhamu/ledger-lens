@@ -70,3 +70,67 @@ async def analyze_document(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{document_id}/status", response_model=Dict[str, Any])
+async def get_analysis_status(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    service: AnalysisService = Depends(get_analysis_service),
+    object_store = Depends(get_object_store)
+):
+    """
+    Get the current status of an analysis.
+    Returns progress information including current stage and status.
+    """
+    try:
+        # First check if there's a status file
+        status_data = await service.get_analysis_status(document_id, current_user.id)
+        
+        if status_data:
+            # Return the progress information
+            return {
+                "status": status_data.get("status", "pending"),
+                "current_stage": status_data.get("current_stage", "pending"),
+                "stage_index": status_data.get("stage_index", 0),
+                "total_stages": status_data.get("total_stages", 4),
+                "message": status_data.get("status_message", "")
+            }
+        
+        # If no status file, check the database for document status
+        doc = turso_db.get_document(document_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Check if the document belongs to the user
+        if doc.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to access this document")
+        
+        # Return basic status from database
+        if doc.analysis_status == "completed":
+            return {
+                "status": "completed",
+                "current_stage": "complete",
+                "stage_index": 4,
+                "total_stages": 4,
+                "message": "Analysis completed"
+            }
+        elif doc.analysis_status == "failed":
+            return {
+                "status": "failed",
+                "current_stage": "failed",
+                "stage_index": 0,
+                "total_stages": 4,
+                "message": "Analysis failed"
+            }
+        else:
+            return {
+                "status": "pending",
+                "current_stage": "pending",
+                "stage_index": 0,
+                "total_stages": 4,
+                "message": "Analysis queued"
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

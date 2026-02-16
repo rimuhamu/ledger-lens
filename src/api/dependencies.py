@@ -18,4 +18,5 @@ def get_object_store() -> ObjectStore:
 @lru_cache()
 def get_analysis_service() -> AnalysisService:
     vector_store = get_vector_store()
-    return AnalysisService(vector_store)
+    object_store = get_object_store()
+    return AnalysisService(vector_store, object_store)

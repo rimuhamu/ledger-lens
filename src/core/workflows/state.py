@@ -14,3 +14,8 @@ class AnalysisState(TypedDict):
     retrieved_sources: List[str]
     generation_logprobs: List[float]
     confidence_metrics: Dict[str, Any]
+    current_stage: str
+    stage_index: int
+    total_stages: int
+    status_message: str
+    status: str

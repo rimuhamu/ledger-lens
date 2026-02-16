@@ -173,6 +173,13 @@ class TursoDB:
             [sentiment_score, sentiment_label, ai_score, risk_level, summary, document_id]
         )
 
+    def update_document_status(self, document_id: str, status: str):
+        """Update only the analysis_status field of a document."""
+        self._client.execute(
+            "UPDATE documents SET analysis_status = ? WHERE id = ?",
+            [status, document_id]
+        )
+
     def delete_document(self, document_id: str):
         """Delete a document record."""
         self._client.execute(
