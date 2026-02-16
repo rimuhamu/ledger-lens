@@ -24,10 +24,10 @@ app.add_middleware(
 print(f"DEBUG: CORS_ORIGINS set to: {settings.CORS_ORIGINS}")
 
 # Include routers
-app.include_router(auth.router)
-app.include_router(documents.router)
-app.include_router(analysis.router)
-app.include_router(dashboard.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(documents.router, prefix="/api")
+app.include_router(analysis.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
 @app.get("/")
 def read_root():
