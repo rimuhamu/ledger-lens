@@ -32,7 +32,7 @@ def test_upload_document_success(mock_embeddings, client, mock_vector_store, moc
         mock_loader.return_value = mock_loader_instance
         
         response = client.post(
-            "/documents/upload",
+            "/api/documents/upload",
             files={"file": ("test.pdf", BytesIO(pdf_content), "application/pdf")},
             data={"ticker": "AAPL"}
         )
@@ -47,7 +47,7 @@ def test_upload_document_non_pdf(client):
     # Auth handled by dependency override
     
     response = client.post(
-        "/documents/upload",
+        "/api/documents/upload",
         files={"file": ("test.txt", BytesIO(b"text content"), "text/plain")},
         data={"ticker": "AAPL"}
     )
@@ -70,7 +70,7 @@ def test_list_documents_success(mock_turso_db, client):
     
     mock_turso_db.list_user_documents.return_value = [mock_doc]
     
-    response = client.get("/documents/")
+    response = client.get("/api/documents/")
     
     assert response.status_code == 200
     data = response.json()
@@ -84,7 +84,7 @@ def test_list_documents_empty(mock_turso_db, client):
     
     mock_turso_db.list_user_documents.return_value = []
     
-    response = client.get("/documents/")
+    response = client.get("/api/documents/")
     
     assert response.status_code == 200
     assert response.json() == []
@@ -106,7 +106,7 @@ def test_get_document_success(client, mock_vector_store):
     mock_results.matches = [mock_match]
     mock_vector_store.query.return_value = mock_results
     
-    response = client.get("/documents/doc123")
+    response = client.get("/api/documents/doc123")
     
     assert response.status_code == 200
     data = response.json()
@@ -120,7 +120,7 @@ def test_get_document_not_found(client, mock_vector_store):
     mock_results.matches = []
     mock_vector_store.query.return_value = mock_results
     
-    response = client.get("/documents/nonexistent")
+    response = client.get("/api/documents/nonexistent")
     
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
@@ -138,7 +138,7 @@ def test_get_document_analysis_structure(client, mock_object_store):
     }
     mock_object_store.get_json.return_value = mock_data
     
-    response = client.get("/documents/doc123/analysis")
+    response = client.get("/api/documents/doc123/analysis")
     
     assert response.status_code == 200
     data = response.json()

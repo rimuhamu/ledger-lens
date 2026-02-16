@@ -39,7 +39,7 @@ def test_register_success(mock_create_token, mock_hash_password, mock_turso_db, 
         created_at="2023-01-01T00:00:00"
     )
     
-    response = client.post("/auth/register", json={
+    response = client.post("/api/auth/register", json={
         "email": "test@example.com",
         "password": "password123"
     })
@@ -59,7 +59,7 @@ def test_register_duplicate_email(mock_turso_db, client):
         created_at="2023-01-01T00:00:00"
     )
     
-    response = client.post("/auth/register", json={
+    response = client.post("/api/auth/register", json={
         "email": "test@example.com",
         "password": "password123"
     })
@@ -70,7 +70,7 @@ def test_register_duplicate_email(mock_turso_db, client):
 @patch('src.api.routes.auth.turso_db')
 def test_register_missing_email(mock_turso_db, client):
     """Test registration with missing email"""
-    response = client.post("/auth/register", json={
+    response = client.post("/api/auth/register", json={
         "email": "",
         "password": "password123"
     })
@@ -83,7 +83,7 @@ def test_register_short_password(mock_turso_db, client):
     """Test registration with password too short"""
     mock_turso_db.get_user_by_email.return_value = None
     
-    response = client.post("/auth/register", json={
+    response = client.post("/api/auth/register", json={
         "email": "test@example.com",
         "password": "short"
     })
@@ -105,7 +105,7 @@ def test_login_success(mock_create_token, mock_verify_password, mock_turso_db, c
         created_at="2023-01-01T00:00:00"
     )
     
-    response = client.post("/auth/login", json={
+    response = client.post("/api/auth/login", json={
         "email": "test@example.com",
         "password": "password123"
     })
@@ -127,7 +127,7 @@ def test_login_invalid_password(mock_verify_password, mock_turso_db, client):
         created_at="2023-01-01T00:00:00"
     )
     
-    response = client.post("/auth/login", json={
+    response = client.post("/api/auth/login", json={
         "email": "test@example.com",
         "password": "wrongpassword"
     })
@@ -140,7 +140,7 @@ def test_login_nonexistent_user(mock_turso_db, client):
     """Test login with non-existent user"""
     mock_turso_db.get_user_by_email.return_value = None
     
-    response = client.post("/auth/login", json={
+    response = client.post("/api/auth/login", json={
         "email": "nonexistent@example.com",
         "password": "password123"
     })
@@ -153,7 +153,7 @@ async def test_get_me_success(client):
     """Test getting current user profile"""
     # Uses default override returning mock_user_instance
     
-    response = client.get("/auth/me")
+    response = client.get("/api/auth/me")
     
     assert response.status_code == 200
     data = response.json()
@@ -167,7 +167,7 @@ def test_get_me_unauthorized(client):
         
     app.dependency_overrides[get_current_user] = raise_unauthorized
     try:
-        response = client.get("/auth/me")
+        response = client.get("/api/auth/me")
     finally:
         # Restore mock user
         # In fixture setup we used a specific lambda, we can't easily restore 'override_get_current_user' 

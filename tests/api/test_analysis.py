@@ -16,7 +16,7 @@ def test_analyze_document_success(client, mock_analysis_service):
     })
     
     response = client.post(
-        "/analysis/doc123",
+        "/api/analysis/doc123",
         json={"query": "What is the revenue?"}
     )
     
@@ -36,7 +36,7 @@ def test_analyze_document_validation_fail(client, mock_analysis_service):
     })
     
     response = client.post(
-        "/analysis/doc123",
+        "/api/analysis/doc123",
         json={"query": "What is the revenue?"}
     )
     
@@ -53,7 +53,7 @@ def test_analyze_document_error(client, mock_analysis_service):
     )
     
     response = client.post(
-        "/analysis/doc123",
+        "/api/analysis/doc123",
         json={"query": "What is the revenue?"}
     )
     

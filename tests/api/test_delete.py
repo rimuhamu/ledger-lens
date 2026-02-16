@@ -27,7 +27,7 @@ def test_delete_document_success(mock_turso_db, client, mock_vector_store, mock_
     mock_turso_db.get_document.return_value = mock_doc
     
     # Execute delete
-    response = client.delete("/documents/doc123")
+    response = client.delete("/api/documents/doc123")
     
     # Assertions
     assert response.status_code == 200
@@ -53,7 +53,7 @@ def test_delete_document_not_found(mock_turso_db, client):
     """Test delete non-existent document"""
     mock_turso_db.get_document.return_value = None
     
-    response = client.delete("/documents/nonexistent")
+    response = client.delete("/api/documents/nonexistent")
     
     assert response.status_code == 404
     assert "not found" in response.json()["detail"]
@@ -72,7 +72,7 @@ def test_delete_document_unauthorized(mock_turso_db, client):
     )
     mock_turso_db.get_document.return_value = mock_doc
     
-    response = client.delete("/documents/doc123")
+    response = client.delete("/api/documents/doc123")
     
     assert response.status_code == 403
     assert "Not authorized" in response.json()["detail"]
