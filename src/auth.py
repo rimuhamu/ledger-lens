@@ -4,8 +4,7 @@ from typing import Optional
 
 import bcrypt
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Cookie, Depends, HTTPException, status
 from jose import JWTError, jwt
 from dotenv import load_dotenv
 
@@ -42,24 +41,24 @@ def decode_access_token(token: str) -> dict:
     """Decode and validate a JWT.  Raises ``JWTError`` on failure."""
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-_bearer_scheme = HTTPBearer()
-
-
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    auth_token: Optional[str] = Cookie(default=None),
 ) -> User:
     """
-    Extract and validate the JWT from ``Authorization: Bearer <token>``.
+    Extract and validate the JWT from the 'auth_token' cookie.
 
     Returns a ``User`` dataclass so handlers have full access to user data.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
-        headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    if auth_token is None:
+        raise credentials_exception
+    
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(auth_token)
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
@@ -73,18 +72,16 @@ async def get_current_user(
 
 
 async def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
-        HTTPBearer(auto_error=False)
-    ),
+    auth_token: Optional[str] = Cookie(default=None),
 ) -> Optional[User]:
     """
     Same as ``get_current_user`` but returns ``None`` when no token is provided.
     Used for endpoints accessible both authenticated and anonymously.
     """
-    if credentials is None:
+    if auth_token is None:
         return None
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(auth_token)
         user_id: str = payload.get("sub")
         if user_id is None:
             return None

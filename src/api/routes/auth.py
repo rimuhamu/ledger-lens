@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from src.domain.schemas.auth import UserRegister, UserLogin, TokenResponse, UserResponse
 from src.auth import (
     hash_password,
@@ -11,7 +11,7 @@ from src.models import turso_db, User
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/register", response_model=TokenResponse)
-async def register(body: UserRegister):
+async def register(body: UserRegister, response: Response):
     """
     Register a new user account.
     """
@@ -29,6 +29,17 @@ async def register(body: UserRegister):
     user = turso_db.create_user(body.email, hash_password(body.password))
 
     token = create_access_token(user.id, user.email)
+    
+    # Set HTTP-only cookie
+    response.set_cookie(
+        key="auth_token",
+        value=token,
+        httponly=True,
+        secure=True,  # Use True in production with HTTPS
+        samesite="strict",
+        max_age=604800,  # 7 days
+        path="/",
+    )
 
     return TokenResponse(
         access_token=token,
@@ -40,7 +51,7 @@ async def register(body: UserRegister):
     )
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: UserLogin):
+async def login(body: UserLogin, response: Response):
     """
     Authenticate with email and password.
     """
@@ -49,6 +60,17 @@ async def login(body: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token(user.id, user.email)
+    
+    # Set HTTP-only cookie
+    response.set_cookie(
+        key="auth_token",
+        value=token,
+        httponly=True,
+        secure=True,  # Use True in production with HTTPS
+        samesite="strict",
+        max_age=604800,  # 7 days
+        path="/",
+    )
 
     return TokenResponse(
         access_token=token,
@@ -58,6 +80,20 @@ async def login(body: UserLogin):
             created_at=user.created_at,
         ),
     )
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Clear the authentication cookie to log out."""
+    response.set_cookie(
+        key="auth_token",
+        value="",
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=0,  # Expire immediately
+        path="/",
+    )
+    return {"message": "Logged out successfully"}
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
