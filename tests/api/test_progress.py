@@ -24,7 +24,7 @@ def test_get_analysis_status_success(mock_turso_db, client, mock_object_store, m
     # Mock get_analysis_status to return data
     mock_analysis_service.get_analysis_status = AsyncMock(return_value=mock_status_data)
     
-    response = client.get("/api/analysis/doc123/status")
+    response = client.get("/analysis/doc123/status")
     
     assert response.status_code == 200
     data = response.json()
@@ -53,7 +53,7 @@ def test_get_analysis_status_fallback_db(mock_turso_db, client, mock_analysis_se
     )
     mock_turso_db.get_document.return_value = mock_doc
     
-    response = client.get("/api/analysis/doc123/status")
+    response = client.get("/analysis/doc123/status")
     
     assert response.status_code == 200
     data = response.json()
@@ -72,7 +72,7 @@ def test_get_analysis_status_not_found(mock_turso_db, client, mock_analysis_serv
     # Mock DB return None
     mock_turso_db.get_document.return_value = None
     
-    response = client.get("/api/analysis/nonexistent/status")
+    response = client.get("/analysis/nonexistent/status")
     
     assert response.status_code == 404
 
